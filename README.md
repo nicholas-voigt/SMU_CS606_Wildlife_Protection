@@ -19,3 +19,14 @@ Given the constraints of this project, it is not possible to train or apply the 
 | 4  | Evaluate Algorithms            | 1. Use-Case Specific Evaluation metrics:</br> time needed for the swarm to identify targets,</br> number of targets identified,</br> energy consumed</br> 2. Process Evaluation metrics: computation time needed,</br> something else???                                                                                           |
 | 5  | Write report                   | We all hate it but we have to...                                                                                      |
 
+
+
+## Setup
+
+Python Version 3.12
+
+necessary modules: </br>
+1. pygame
+2. numpy
+3. notebook (dev only)
+4. matplotlib (dev only)
