@@ -8,7 +8,7 @@
 import pygame
 import random
 from collections import defaultdict
-from simulator.states import *
+# from simulator.states import *
 from simulator.settings import *
 
 
@@ -36,7 +36,6 @@ class Agent(pygame.sprite.Sprite):
         self.base_speed = None
         self.position = pygame.Vector2(x, y)
         self.scan_range = None
-        self.detected_agents = []
         
         # Pygame sprite setup for rendering
         self.image = pygame.Surface((10, 10))
@@ -90,11 +89,7 @@ class Agent(pygame.sprite.Sprite):
 
 class Drone(Agent):
     def __init__(self, name, x, y):
-        super().__init__(
-            name=name,
-            states={'HighAltitude': DroneHighAltitude(), 'LowAltitude': DroneLowAltitude()}, 
-            x=x, y=y, color=(0, 0, 255)  # Blue
-            )
+        super().__init__(name=name, states=DRONE_STATES, x=x, y=y, color=DRONE_COLOR)
         self.type = 'Drone'
         self.base_speed = DRONE_SPEED
         self.scan_range = DRONE_SCAN_RANGE
@@ -106,7 +101,7 @@ class Drone(Agent):
         # Perform the action of the current state
         self.active_state.action()
         
-        # Call controller to check if state transition is needed
+        # Call controller to check if state transition is needed TODO: Implement controller
         if self.active_state.check_transition() and controller.evaluate_state_transition(self):
             # Transition to the new state
             if isinstance(self.active_state, DroneHighAltitude):
@@ -117,14 +112,11 @@ class Drone(Agent):
 
 class Animal(Agent):
     def __init__(self, name, x, y):
-        super().__init__(
-            name=name, speed=ANIMAL_SPEED, scan_range=ANIMAL_SCAN_RANGE, 
-            states={'Idle': AnimalIdle(), 'Flee': AnimalFleeing(), 'Dead': AnimalDead()}, 
-            x=x, y=y, color=(0, 255, 0)  # Green
-            )
+        super().__init__(name=name, speed=ANIMAL_SPEED, x=x, y=y, color=ANIMAL_COLOR)
         self.type = 'Animal'
         self.base_speed = ANIMAL_SPEED
         self.scan_range = ANIMAL_SCAN_RANGE
+        self.thread = None
         # Set initial state
         self.set_state(self.states['Idle'])
         
@@ -152,17 +144,14 @@ class Animal(Agent):
 
 class Poacher(Agent):
     def __init__(self, name, x, y):
-        super().__init__(
-            name=name, 
-            states={'Hunting': PoacherHunting(), 'Attacking': PoacherAttacking(), 'Caught': PoacherCaught()}, 
-            x=x, y=y, color=(0, 255, 0)  # Green
-            )  
+        super().__init__(name=name, states=POACHER_STATES, x=x, y=y, color=POACHER_COLOR)  
         self.type = 'Poacher'
         self.base_speed = POACHER_SPEED
         self.scan_range = POACHER_SCAN_RANGE
         self.stealth = 0.7  # TODO: What is this?
         self.attack_range = 30
         self.attack_duration = 5
+        self.target = None
         # Set initial state
         self.set_state(self.states['Hunting'])
 

@@ -4,7 +4,7 @@
 
 import pygame
 from simulator.agents import Drone, Animal, Poacher
-from simulator.settings import WIDTH, HEIGHT, FPS
+from simulator.settings import WIDTH, HEIGHT, FPS, drones_to_deploy, poachers_to_deploy, animals_to_deploy
 
 
 def run():
@@ -14,11 +14,38 @@ def run():
     clock = pygame.time.Clock()
 
     # Create agents
-    drones = [Drone(100, 100)]
-    animals = [Animal(400, 300), Animal(420, 320)]
-    poachers = [Poacher(600, 400)]
+    drones = drones_to_deploy
+    animals = poachers_to_deploy
+    poachers = animals_to_deploy
 
     all_sprites = pygame.sprite.Group(drones + animals + poachers)
+    
+    # Handle agents in separate groups for easier access
+    # if any of these alive groups is empty, the game is over TODO: Implement game over
+    alive_animal_sprites = pygame.sprite.Group(animals)
+    alive_poacher_sprites = pygame.sprite.Group(poachers)
+    
+    # Handle drone search globally since drones can communicate
+    detected_animal_sprites = pygame.sprite.Group()
+    detected_poacher_sprites = pygame.sprite.Group()
+    
+    # Define custom events for communication between agents
+    # Poacher Events:
+    # 1. Poacher has detected an animal
+    POACHER_DETECT_ANIMAL = pygame.USEREVENT + 1
+    # 2. Poacher has killed an animal
+    POACHER_KILL_ANIMAL = pygame.USEREVENT + 2
+    
+    # Drone Events:
+    # 1. Drone has detected a poacher
+    DRONE_DETECT_POACHER = pygame.USEREVENT + 3
+    # 2. Drone has detected an animal
+    DRONE_DETECT_ANIMAL = pygame.USEREVENT + 4
+    # 3. Drone has lost track of poacher
+    DRONE_LOST_POACHER = pygame.USEREVENT + 5
+    # 4. Drone has lost track of animal
+    DRONE_LOST_ANIMAL = pygame.USEREVENT + 6
+    
 
     # Main loop
     running = True
