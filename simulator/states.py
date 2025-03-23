@@ -58,7 +58,7 @@ class DroneHighAltitude(State):
 
     def check_transition(self):
         # always true for low altitude state
-        return DroneLowAltitude
+        return DroneLowAltitude()
 
 
 class DroneLowAltitude(State):
@@ -84,7 +84,7 @@ class DroneLowAltitude(State):
 
     def check_transition(self):
         # always true for high altitude state
-        return DroneHighAltitude
+        return DroneHighAltitude()
 
 
 # Animal states
@@ -113,7 +113,7 @@ class AnimalIdle(State):
             
             # If threat is close enough, transition to fleeing state
             if distance < self.agent.threat_range:
-                return AnimalFleeing
+                return AnimalFleeing()
         
         # Stay in Idle state if no threat is in sight or not in range
         return None  # Transition to dead state triggered by event and not self-check
@@ -145,7 +145,7 @@ class AnimalFleeing(State):
                 return None # Transition to dead state triggered by event and not self-check
         
         # Transition to Idle state if threat is lost or not in range
-        return AnimalIdle
+        return AnimalIdle()
 
 
 
@@ -166,7 +166,7 @@ class PoacherIdle(State):
     def check_transition(self):
         # Check if agent has a target & transition to Hunting state
         if self.agent.target:
-            return PoacherHunting
+            return PoacherHunting()
         
         return None  # Transition to dead state triggered by event and not self-check
     
@@ -194,7 +194,7 @@ class PoacherHunting(State):
 
             # If target is in attack range, transition to attacking state
             if distance < self.agent.attack_range:
-                return PoacherAttacking
+                return PoacherAttacking()
             
             # If target is out of attack range, stay in Hunting state
             else:
@@ -202,7 +202,7 @@ class PoacherHunting(State):
         
         # Transition to Idle state if target is lost
         else:
-            return PoacherIdle
+            return PoacherIdle()
 
 
 class PoacherAttacking(State):
@@ -247,10 +247,10 @@ class PoacherAttacking(State):
             
             # If target is out of attack range, transition back to Hunting state
             else:
-                return PoacherHunting
+                return PoacherHunting()
             
         # Transition to Idle state if target is lost or dead  --> target = None
-        return PoacherIdle
+        return PoacherIdle()
 
     
 class Terminal(State):

@@ -5,7 +5,7 @@
 import pygame
 from events import POACHER_KILLED_ANIMAL, DRONE_DETECTED_POACHER, DRONE_CAUGHT_POACHER, DRONE_DETECTED_ANIMAL, DRONE_LOST_POACHER, DRONE_LOST_ANIMAL
 from agents import Drone, Animal, Poacher
-from states import Terminal
+from states import Terminal, DroneHighAltitude, DroneLowAltitude
 from settings import WIDTH, HEIGHT, FPS
 
 
@@ -14,6 +14,7 @@ def run():
     # Pygame setup
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Wildlife Protection Simulator") 
     clock = pygame.time.Clock()
 
     # Create agents
@@ -29,10 +30,14 @@ def run():
     all_sprites = pygame.sprite.Group(drones + animals + poachers)
     
     # Handle agents in separate groups for easier access
+    animals_sprites = pygame.sprite.Group(animals)
+    poachers_sprites = pygame.sprite.Group(poachers)
+    drones_sprites = pygame.sprite.Group(drones)
+
+    # Track alive agents seperately,
     # if any of these alive groups is empty, the game is over
     alive_animal_sprites = pygame.sprite.Group(animals)
     alive_poacher_sprites = pygame.sprite.Group(poachers)
-    drones_sprites = pygame.sprite.Group(drones)
     
     # Handle drone search globally since drones can communicate
     detected_animal_sprites = pygame.sprite.Group()
@@ -42,8 +47,6 @@ def run():
     # Main loop
     running = True
     while running:
-        clock.tick(FPS)
-        screen.fill((30, 30, 30))  # Background color
 
         # Event handling
         for event in pygame.event.get():
@@ -127,12 +130,37 @@ def run():
             # Perform the action of the current state
             poacher.active_state.action()
 
+        # Update drones
+        # empty the global list of detected agents first and then rebuild
+        detected_animal_sprites.empty()
+        detected_poacher_sprites.empty()
         for drone in drones_sprites:
-            # Scan surroundings for poachers and animals
-            # TODO: How do I implement state check here?
-            drone.update()
+            # Scan surroundings for animals
+            detected_agents = drone.scan_surroundings(agents=animals_sprites, mode='all')
+                
+            # Add detected animals to the global list
+            for agent in detected_agents:
+                detected_animal_sprites.add(agent)
+            
+            # If drone state is Low Altitude, also check for poachers
+            if isinstance(drone.active_state, DroneLowAltitude):
+                # Scan surroundings for poachers
+                detected_agents = drone.scan_surroundings(agents=poachers_sprites, mode='all')
+                
+                # Add detected poachers to the global list
+                for agent in detected_agents:
+                    detected_poacher_sprites.add(agent)
+        
+        # Update drones
+        for drone in drones_sprites:
+            
+            # Check state transitions
+            state = drone.active_state.check_transition()
+            
 
-        # Draw agents
+        # Update screen
+        clock.tick(FPS)
+        screen.fill((30, 30, 30))  # Background color
         all_sprites.draw(screen)
         pygame.display.flip()
 
