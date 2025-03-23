@@ -8,8 +8,8 @@ from events import POACHER_KILLED_ANIMAL, DRONE_DETECTED_POACHER, DRONE_CAUGHT_P
 from agents import Drone, Animal, Poacher
 from states import Terminal, DroneHighAltitude, DroneLowAltitude
 from settings import WIDTH, HEIGHT, FPS
-from simulator.pso_optimizer import PSOOptimizer
-from simulator.rl_optimizer import RLOptimizer
+from pso_optimizer import PSOOptimizer
+from rl_optimizer import RLOptimizer
 
 
 # Main game loop

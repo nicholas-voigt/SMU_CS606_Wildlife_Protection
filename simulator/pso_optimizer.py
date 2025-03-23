@@ -1,7 +1,7 @@
 import pygame
 import random
-from simulator.optimizer import DroneOptimizer
-from simulator.states import DroneHighAltitude, DroneLowAltitude
+from optimizer import DroneOptimizer
+from states import DroneHighAltitude, DroneLowAltitude
 
 class PSOOptimizer(DroneOptimizer):
     """Particle Swarm Optimization for drone control"""

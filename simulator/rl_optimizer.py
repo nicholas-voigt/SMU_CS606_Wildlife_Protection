@@ -1,8 +1,8 @@
 import pygame
 import random
 import numpy as np
-from simulator.optimizer import DroneOptimizer
-from simulator.states import DroneHighAltitude, DroneLowAltitude
+from optimizer import DroneOptimizer
+from states import DroneHighAltitude, DroneLowAltitude
 
 class RLOptimizer(DroneOptimizer):
     """Reinforcement Learning Optimizer for drone control"""
