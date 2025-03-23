@@ -3,7 +3,6 @@
 import pygame
 import random
 
-from controller import Controller
 from events import POACHER_KILLED_ANIMAL, DRONE_DETECTED_POACHER, DRONE_CAUGHT_POACHER, DRONE_DETECTED_ANIMAL, DRONE_LOST_POACHER, DRONE_LOST_ANIMAL
 
 class State:
@@ -38,22 +37,9 @@ class State:
 class DroneHighAltitude(State):
     def __init__(self):
         super().__init__()
-        self.current_animals_in_sight = pygame.sprite.Group()
         
     def action(self):
-        # High-Level Search for Animals
-        if self.agent:
-            # Perform scan for animals & overwrite the current agents in sight
-            detected = self.agent.scan_surroundings("Animal")
-            self.current_animals_in_sight.empty()
-            for animal in detected:
-                self.current_animals_in_sight.add(animal)
-            
-            # Get instructions for movement from controller
-            direction = self.agent.controller.get_direction()
-            
-            # Move agent in the given direction
-            self.agent.move(direction)
+        # Implementation of state action through optimizer
         return
 
     def check_transition(self):
@@ -64,22 +50,9 @@ class DroneHighAltitude(State):
 class DroneLowAltitude(State):
     def __init__(self):
         super().__init__(speed_modifier=0.7, scan_range_modifier=0.5, detection_probability=0.9)
-        self.current_poachers_in_sight = pygame.sprite.Group()
 
     def action(self):
-        # Low-Level Search for Poachers 
-        if self.agent:
-            # Perform scan for poachers & overwrite the current agents in sight
-            detected = self.agent.scan_surroundings("Poacher")
-            self.current_poachers_in_sight.empty()
-            for animal in detected:
-                self.current_poachers_in_sight.add(animal)
-            
-            # Get instructions for movement from controller
-            direction = self.agent.controller.get_direction()
-            
-            # Move agent in the given direction
-            self.agent.move(direction)
+        # Implementation of state action through optimizer
         return
 
     def check_transition(self):

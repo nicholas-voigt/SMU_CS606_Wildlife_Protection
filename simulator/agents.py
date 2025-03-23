@@ -10,7 +10,6 @@ import heapq
 
 from settings import *
 from states import DroneHighAltitude, AnimalIdle, PoacherIdle
-from controller import Controller
 
 
 class Agent(pygame.sprite.Sprite):
@@ -60,7 +59,7 @@ class Agent(pygame.sprite.Sprite):
         self.active_state.enter(agent=self)
         return
     
-    def move(self, direction):
+    def move(self, direction, speed=None):
         """
         Move agent in the given direction with the speed specified in the state.
         Args:
@@ -69,8 +68,11 @@ class Agent(pygame.sprite.Sprite):
         # Normalize the direction vector
         direction.normalize() if direction.length() > 0 else direction
 
-        # calculate new position
-        self.position += direction * self.base_speed * self.active_state.speed_modifier
+        # If speed is specified, use it to calculate new position, otherwise use the state's speed modifier
+        if speed:
+            self.position += direction * speed
+        else:
+            self.position += direction * self.base_speed * self.active_state.speed_modifier
         
         # Keep agent within boundaries
         self.position.x = max(0, min(WIDTH, self.position.x))
@@ -120,7 +122,6 @@ class Drone(Agent):
     def __init__(self, name, x, y):
         super().__init__(name=name, x=x, y=y, color=DRONE_COLOR)
         self.type = 'Drone'
-        self.controller = Controller(self)
         self.base_speed = DRONE_SPEED
         self.scan_range = DRONE_SCAN_RANGE
         # Set initial state

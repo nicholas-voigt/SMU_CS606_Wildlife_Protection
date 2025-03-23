@@ -2,20 +2,31 @@
 # Call this script to start the simulator
 # Eventhandling
 
+import sys
 import pygame
 from events import POACHER_KILLED_ANIMAL, DRONE_DETECTED_POACHER, DRONE_CAUGHT_POACHER, DRONE_DETECTED_ANIMAL, DRONE_LOST_POACHER, DRONE_LOST_ANIMAL
 from agents import Drone, Animal, Poacher
 from states import Terminal, DroneHighAltitude, DroneLowAltitude
 from settings import WIDTH, HEIGHT, FPS
+from simulator.pso_optimizer import PSOOptimizer
+from simulator.rl_optimizer import RLOptimizer
 
 
 # Main game loop
-def run():
+def run(optimizer_type='pso'):
     # Pygame setup
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Wildlife Protection Simulator") 
     clock = pygame.time.Clock()
+    
+    # Select optimizer based on type
+    if optimizer_type.lower() == "pso":
+        optimizer = PSOOptimizer()
+    elif optimizer_type.lower() == "rl":
+        optimizer = RLOptimizer()
+    else:
+        raise ValueError(f"Unknown optimizer type: {optimizer_type}")
 
     # Create agents
     drones = []
@@ -151,11 +162,19 @@ def run():
                 for agent in detected_agents:
                     detected_poacher_sprites.add(agent)
         
-        # Update drones
-        for drone in drones_sprites:
+        # Get drone actions from optimizer
+        drone_actions = optimizer.optimize(drones_sprites, detected_animal_sprites, detected_poacher_sprites)
+        
+        # Apply drone actions
+        for drone, action in drone_actions.items():
+            # Update drone state if needed
+            if action['state']:
+                drone.set_state(action['state'])
             
-            # Check state transitions
-            state = drone.active_state.check_transition()
+            # Move drone in the specified direction with specified speed
+            drone.move(action['direction'], action['speed_modifier'] * drone.base_speed)
+            
+            # You can also invoke other drone actions here based on the optimizer's output
             
 
         # Update screen
@@ -168,4 +187,6 @@ def run():
 
 
 if __name__ == '__main__':
-    run()
+    # Default to PSO if no argument provided
+    optimizer_type = sys.argv[1] if len(sys.argv) > 1 else "pso"
+    run(optimizer_type)
