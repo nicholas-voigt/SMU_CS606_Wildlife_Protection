@@ -27,6 +27,8 @@ def run(optimizer_type='pso'):
     # Create rectangles for game area and panel
     game_rect = pygame.Rect(0, 0, GAME_WIDTH, HEIGHT)
     panel_rect = pygame.Rect(GAME_WIDTH, 0, PANEL_WIDTH, HEIGHT)
+    # Create a transparent surface to visualize the scan range of agents
+    transparent_surface = pygame.Surface((GAME_WIDTH, HEIGHT), pygame.SRCALPHA)
     # Initialize fonts
     pygame.font.init()
     font = pygame.font.SysFont('Arial', 16)
@@ -194,8 +196,26 @@ def run(optimizer_type='pso'):
         clock.tick(FPS)
         screen.fill((30, 30, 30))  # Fill the entire screen with background color
         
-        # Draw all sprites (they will only be visible in the game area)
+        # Draw the game area
+        # Clear the transparent surface
+        transparent_surface.fill((0, 0, 0, 0))  # Completely transparent
+        
+        # Draw scan ranges for each agent type
+        for agent in all_sprites:
+            # Draw a circle on the transparent surface
+            pygame.draw.circle(
+                surface=transparent_surface,
+                color=(*agent.image.get_at((5, 5))[:3], 50),  # Get agent color with 50 alpha
+                center=(int(agent.position.x), int(agent.position.y)),
+                radius=agent.scan_range * agent.active_state.scan_range_modifier,  # Scan range
+                width=1  # Line width
+            )
+
+        # Draw the game elements
         all_sprites.draw(screen)
+
+        # Blit the transparent surface on top
+        screen.blit(transparent_surface, (0, 0))
         
         # Render information panel
         render_info_panel(screen, drones_sprites, alive_animal_sprites, 

@@ -75,7 +75,7 @@ class Agent(pygame.sprite.Sprite):
             self.position += direction * self.base_speed * self.active_state.speed_modifier
         
         # Keep agent within boundaries
-        self.position.x = max(0, min(WIDTH, self.position.x))
+        self.position.x = max(0, min(GAME_WIDTH, self.position.x))
         self.position.y = max(0, min(HEIGHT, self.position.y))
 
         # Update the sprite position
