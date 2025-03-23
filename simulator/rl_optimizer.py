@@ -15,6 +15,13 @@ class RLOptimizer(DroneOptimizer):
         self.previous_states = {}  # {drone_name: previous_state}
         self.previous_actions = {}  # {drone_name: previous_action}
         
+        # Add a visit counter to track how often a state has been visited
+        self.state_visits = {}  # {state_key: visit_count}
+        
+        # Track position history for each drone
+        self.position_history = {}  # {drone_name: [last_n_positions]}
+        self.history_size = 10  # Number of positions to remember
+        
     def discretize_state(self, drone, detected_animals, detected_poachers):
         """Convert continuous state to discrete state for Q-learning"""
         # Create a simple grid-based state representation
@@ -51,6 +58,43 @@ class RLOptimizer(DroneOptimizer):
         
         return state_key
     
+    def update_position_history(self, drone):
+        """Update the position history for a drone"""
+        if drone.name not in self.position_history:
+            self.position_history[drone.name] = []
+        
+        # Add current position to history
+        current_pos = (drone.position.x, drone.position.y)
+        self.position_history[drone.name].append(current_pos)
+        
+        # Keep only the last n positions
+        if len(self.position_history[drone.name]) > self.history_size:
+            self.position_history[drone.name].pop(0)
+    
+    def get_exploration_penalty(self, drone, state):
+        """Calculate an exploration penalty based on visit frequency and position history"""
+        # Penalty based on state visit count (logarithmic to avoid over-penalizing)
+        visit_penalty = -np.log(self.state_visits.get(state, 0) + 1) * 0.2
+        
+        # Penalty for revisiting recent positions
+        position_penalty = 0
+        if drone.name in self.position_history and len(self.position_history[drone.name]) > 0:
+            current_grid_x = int(drone.position.x / (800/5))
+            current_grid_y = int(drone.position.y / (600/5))
+            
+            # Count how many times the drone has been in the same grid cell recently
+            grid_visits = 0
+            for pos in self.position_history[drone.name]:
+                hist_grid_x = int(pos[0] / (800/5))
+                hist_grid_y = int(pos[1] / (600/5))
+                if hist_grid_x == current_grid_x and hist_grid_y == current_grid_y:
+                    grid_visits += 1
+            
+            # Penalize staying in the same grid cell
+            position_penalty = -grid_visits * 0.1
+        
+        return visit_penalty + position_penalty
+    
     def get_reward(self, drone, detected_animals, detected_poachers):
         """Calculate reward based on current situation"""
         reward = 0
@@ -64,6 +108,13 @@ class RLOptimizer(DroneOptimizer):
         # Penalty for being in wrong state
         if detected_poachers and not isinstance(drone.active_state, DroneLowAltitude):
             reward -= 2  # Penalty for not being in low altitude when poachers detected
+        
+        # Get current state
+        state = self.discretize_state(drone, detected_animals, detected_poachers)
+        
+        # Add exploration penalty
+        exploration_penalty = self.get_exploration_penalty(drone, state)
+        reward += exploration_penalty
         
         return reward
     
