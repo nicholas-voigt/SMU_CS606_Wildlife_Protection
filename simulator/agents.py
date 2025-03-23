@@ -59,20 +59,41 @@ class Agent(pygame.sprite.Sprite):
         self.active_state.enter(agent=self)
         return
     
-    def move(self, direction, speed=None):
+    def move(self, vector, speed=None, mode='direction'):
         """
-        Move agent in the given direction with the speed specified in the state.
+        Move agent to the given position if within speed range, else on a vector towards it.
         Args:
-            direction: pygame.Vector2, direction to move in
+            vector: pygame.Vector2, can be position to move to or direction to move in
+            speed: int, speed to move with if specified
+            mode: str, 'direction' or 'position', whether vector is a direction or a position
         """
-        # Normalize the direction vector
-        direction.normalize() if direction.length() > 0 else direction
-
-        # If speed is specified, use it to calculate new position, otherwise use the state's speed modifier
-        if speed:
-            self.position += direction * speed
+        velocity = speed if speed else self.base_speed * self.active_state.speed_modifier
+        
+        # If vector is a position, calculate the direction vector
+        if mode == 'position':
+            
+            # Calculate distance to the target position & check if it can be reached
+            distance = self.position.distance_to(vector)
+            if distance <= velocity:
+                
+                # Update the agents position to the target position
+                self.position = vector
+            
+            # Calculate the direction vector to the target position
+            else:
+                direction = pygame.Vector2(vector - self.position)
+                direction.normalize()
+                
+                # Move the agent in the direction of the target position
+                self.position += direction * velocity
+        
+        # If vector is a direction, move the agent in that direction
+        elif mode == 'direction':
+            direction = vector.normalize() if vector.length() > 1 else vector
+            self.position += direction * velocity
+        
         else:
-            self.position += direction * self.base_speed * self.active_state.speed_modifier
+            raise ValueError(f"Invalid mode: {mode}")
         
         # Keep agent within boundaries
         self.position.x = max(0, min(GAME_WIDTH, self.position.x))
@@ -159,9 +180,9 @@ class Poacher(Agent):
         self.type = 'Poacher'
         self.base_speed = POACHER_SPEED
         self.scan_range = POACHER_SCAN_RANGE
-        self.attack_range = 30
-        self.attack_duration = 5
-        self.kill_range = 5
+        self.attack_range = POACHER_ATTACK_RANGE
+        self.attack_duration = POACHER_ATTACK_DURATION
+        self.kill_range = POACHER_KILL_RANGE
         self.target = None
         # Set initial state
         self.set_state(PoacherIdle())

@@ -74,7 +74,7 @@ class AnimalIdle(State):
         direction = pygame.Vector2(random.randint(-1, 1), random.randint(-1, 1))
         
         # Move agent in the given direction
-        self.agent.move(direction)
+        self.agent.move(direction, mode='direction')
         return
     
     def check_transition(self):
@@ -100,10 +100,10 @@ class AnimalFleeing(State):
     def action(self):
         # Fast movement away from threat
         # Caclulate direction to flee from threat
-        direction = self.agent.position - self.agent.threat.position
+        direction = pygame.Vector2(self.agent.position - self.agent.threat.position)
 
         # Move agent in the opposite direction
-        self.agent.move(direction)
+        self.agent.move(direction, mode='direction')
         return
         
     def check_transition(self):
@@ -133,7 +133,7 @@ class PoacherIdle(State):
         direction = pygame.Vector2(random.randint(-1, 1), random.randint(-1, 1))
 
         # Move agent in the given direction
-        self.agent.move(direction)
+        self.agent.move(direction, mode='direction')
         return
     
     def check_transition(self):
@@ -146,15 +146,12 @@ class PoacherIdle(State):
 
 class PoacherHunting(State):
     def __init__(self):
-        super().__init__(speed_modifier=0.7, scan_range_modifier=1.0, detection_probability=1.0)
+        super().__init__(speed_modifier=1.0, scan_range_modifier=1.0, detection_probability=1.0)
         
     def action(self):
         # Hunt the target animal
-        # Caclulate direction towards target
-        direction = self.agent.target.position - self.agent.position
-
-        # Move agent in the direction of the target
-        self.agent.move(direction)
+        # Move agent towards the position of the target
+        self.agent.move(self.agent.target.position, mode='position')
         return
         
     def check_transition(self):
@@ -180,7 +177,7 @@ class PoacherHunting(State):
 
 class PoacherAttacking(State):
     def __init__(self):
-        super().__init__(speed_modifier=1.2, scan_range_modifier=1.0, detection_probability=1.0)
+        super().__init__(speed_modifier=1.5, scan_range_modifier=1.0, detection_probability=1.0)
         self.attack_time = 0
         
     def action(self):
@@ -191,7 +188,7 @@ class PoacherAttacking(State):
         if self.agent.position.distance_to(self.agent.target.position) < self.agent.kill_range:
 
             # create and post kill event
-            kill_event = pygame.event.Event(POACHER_KILLED_ANIMAL, {'animal': self.agent.target})
+            kill_event = pygame.event.Event(POACHER_KILLED_ANIMAL, {'animal': self.agent.target, 'poacher': self.agent})
             pygame.event.post(kill_event)
             
             # set target to None
@@ -199,12 +196,7 @@ class PoacherAttacking(State):
 
         # if animal is not in kill range, move towards animal
         else:
-
-            # Caclulate direction towards target
-            direction = self.agent.target.position - self.agent.position
-
-            # Move agent in the direction of the target
-            self.agent.move(direction)
+            self.agent.move(self.agent.target.position, mode='position')
         return
     
     def check_transition(self):
