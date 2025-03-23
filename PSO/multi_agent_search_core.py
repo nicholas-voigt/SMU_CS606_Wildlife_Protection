@@ -1,36 +1,27 @@
 import numpy as np
 
 class PSODroneSearch:
-    # PSO Parameters
-    NUM_PARTICLES = 20  # Number of particles (drones)
-    MAX_ITER = 100  # Maximum iterations
-    W = 0.5  # Inertia weight
-    C1 = 1.5  # Cognitive coefficient
-    C2 = 1.5  # Social coefficient
+    
+    def __init__(self, area_size=100, num_particles=3, max_speed=5, max_scan_radius=150, min_scan_radius=None, 
+                 animal_locations=None, poacher_locations=None, drone_locations=None):
+        # PSO Parameters - can be overridden when instantiated
+        self.NUM_PARTICLES = num_particles
+        self.MAX_ITER = 100  # Maximum iterations
+        self.W = 0.5  # Inertia weight
+        self.C1 = 1.5  # Cognitive coefficient
+        self.C2 = 1.5  # Social coefficient
 
-    # Search Area Parameters
-    AREA_SIZE = 100
-    MAX_SPEED = 5
-    MAX_SCAN_RADIUS = 20
-    MIN_SCAN_RADIUS = 5
+        # Search Area Parameters - can be overridden when instantiated
+        self.AREA_SIZE = area_size
+        self.MAX_SPEED = max_speed
+        self.MAX_SCAN_RADIUS = max_scan_radius
+        self.MIN_SCAN_RADIUS = min_scan_radius if min_scan_radius is not None else max_scan_radius // 3
 
-    def __init__(self):
         # Initialize target locations with greater separation
-        self.animal_location = np.array([np.random.randint(0, self.AREA_SIZE), 
-                                       np.random.randint(0, self.AREA_SIZE)], dtype=float)
+        self.animal_locations = animal_sprites
+        self.poacher_locations = poacher_sprites
+        self.drone_locations = drone_sprites
         
-        # Place poacher 10-20 units away from herd in a random direction
-        random_angle = np.random.uniform(0, 2 * np.pi)
-        random_distance = np.random.uniform(10, 20)
-        poacher_offset = np.array([
-            random_distance * np.cos(random_angle),
-            random_distance * np.sin(random_angle)
-        ])
-        self.poacher_location = np.clip(
-            self.animal_location + poacher_offset,
-            0, self.AREA_SIZE
-        ).astype(float)
-
         # Initialize Particles (Drones)
         self.particles = np.random.randint(0, self.AREA_SIZE, (self.NUM_PARTICLES, 2))
         self.initial_locations = np.copy(self.particles)
@@ -61,6 +52,7 @@ class PSODroneSearch:
         """
         distance_to_animal = np.linalg.norm(particle - self.animal_location)
         if distance_to_animal <= scan_radius:
+            # change altitude here
             distance_to_poacher = np.linalg.norm(particle - self.poacher_location)
             return distance_to_poacher  # Prioritize finding the poacher
         return distance_to_animal  # Prioritize detecting the animal first
@@ -105,7 +97,7 @@ class PSODroneSearch:
         if any(self.animal_location <= 0) or any(self.animal_location >= self.AREA_SIZE):
             self.herd_direction *= -1
 
-    def run_search(self):
+    def update_velocity_and_position(self):
         for iteration in range(self.MAX_ITER):
             # Update target positions
             self.update_target_positions()
@@ -132,8 +124,11 @@ class PSODroneSearch:
                 
                 self.particles[i] = self.particles[i] + self.velocities[i]
                 self.particles[i] = np.clip(self.particles[i], 0, self.AREA_SIZE)
-                
-                # Adapt scanning radius
+# return a dictionary {drone:(state, position)}
+                return self.velocities[i], self.particles[i]
+    
+
+                # # Adapt scanning radius
                 '''If the Drone is within its scan radius of the Herd:
                 scan radius is set to a minimum value (self.MIN_SCAN_RADIUS)
                 If the Drone is outside its scan radius of the Herd:

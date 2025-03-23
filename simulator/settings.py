@@ -12,9 +12,9 @@ ANIMAL_COLOR = (0, 255, 0)  # Green
 
 # Simulation Parameters
 # Speeds
-DRONE_SPEED = 3
-POACHER_SPEED = 1.5
-ANIMAL_SPEED = 2
+DRONE_SPEED = 30
+POACHER_SPEED = 15
+ANIMAL_SPEED = 10
 
 # Scan Ranges
 DRONE_SCAN_RANGE = 150
