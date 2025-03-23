@@ -4,6 +4,7 @@
 
 import sys
 import pygame
+from collections import deque
 
 from settings import WIDTH, GAME_WIDTH, PANEL_WIDTH, HEIGHT, FPS
 from game_env import render_info_panel
@@ -42,6 +43,11 @@ def run(optimizer_type='pso'):
         optimizer = RLOptimizer()
     else:
         raise ValueError(f"Unknown optimizer type: {optimizer_type}")
+    
+    # Event log for displaying recent events (max 15 events)
+    event_log = deque(maxlen=15)
+    # Add initial message
+    event_log.append(("Simulation started", pygame.time.get_ticks()))
 
     # Create agents
     drones = []
@@ -51,7 +57,6 @@ def run(optimizer_type='pso'):
     # drones = [Drone('good boy', 100, 100)]
     # animals = [Animal('elephant', 400, 300), Animal(420, 320)]
     # poachers = [Poacher('bad boy', 600, 400)]
-
 
     all_sprites = pygame.sprite.Group(drones + animals + poachers)
     
@@ -68,7 +73,6 @@ def run(optimizer_type='pso'):
     # Handle drone search globally since drones can communicate
     detected_animal_sprites = pygame.sprite.Group()
     detected_poacher_sprites = pygame.sprite.Group()
-    
 
     # Main loop
     running = True
@@ -86,8 +90,9 @@ def run(optimizer_type='pso'):
                 animal = event.animal
                 animal.set_state(Terminal)
                 alive_animal_sprites.remove(animal)
+                event_log.append((f"Poacher {event.poacher.name} killed {animal.name}", pygame.time.get_ticks()))
                 if len(alive_animal_sprites) == 0:
-                    print("Game Over! Poachers have killed all animals")
+                    event_log.append(("Game Over! Poachers have killed all animals", pygame.time.get_ticks()))
                     running = False
             
             # poacher caught by drone
@@ -96,7 +101,7 @@ def run(optimizer_type='pso'):
                 poacher.set_state(Terminal)
                 alive_poacher_sprites.remove(poacher)
                 if len(alive_poacher_sprites) == 0:
-                    print("Congratulations! All poachers have been caught")
+                    event_log.append(("Congratulations! All poachers have been caught", pygame.time.get_ticks()))
                     running = False
             
             # animal detected by drone
@@ -132,6 +137,7 @@ def run(optimizer_type='pso'):
             state = animal.active_state.check_transition()
             if state:
                 animal.set_state(state)
+                event_log.append((f"{animal.name} changed state to {state.__class__.__name__}", pygame.time.get_ticks()))
             
             # Perform the action of the current state
             animal.active_state.action()
@@ -139,19 +145,21 @@ def run(optimizer_type='pso'):
         # Update poachers
         for poacher in alive_poacher_sprites:
 
-            # If poacher has no target, search animals
-            if not poacher.target:
+            # Scan surroundings for the closest animal
+            detected_agent = poacher.scan_surroundings(agents=alive_animal_sprites, mode='nearest')
 
-                # Scan surroundings for the closest animal
-                detected_agent = poacher.scan_surroundings(agents=alive_animal_sprites, mode='nearest')
-
+            # If poacher detected an animal, update if there is no other target
+            if detected_agent:
                 # Update target
-                poacher.target = detected_agent[2] if detected_agent else None
-
+                poacher.target = detected_agent[2] if not poacher.target else poacher.target
+            else:
+                poacher.target = None
+            
             # Check state transitions
             state = poacher.active_state.check_transition()
             if state:
                 poacher.set_state(state)
+                event_log.append((f"{poacher.name} changed state to {state.__class__.__name__}", pygame.time.get_ticks()))
 
             # Perform the action of the current state
             poacher.active_state.action()
@@ -185,6 +193,7 @@ def run(optimizer_type='pso'):
             # Update drone state if needed
             if action['state']:
                 drone.set_state(action['state'])
+                event_log.append((f"{drone.name} changed state to {action['state'].__class__.__name__}", pygame.time.get_ticks()))
             
             # Move drone in the specified direction with specified speed
             drone.move(action['direction'], action['speed_modifier'] * drone.base_speed)
@@ -219,7 +228,7 @@ def run(optimizer_type='pso'):
         
         # Render information panel
         render_info_panel(screen, drones_sprites, alive_animal_sprites, 
-                         alive_poacher_sprites, panel_rect, font, title_font)
+                         alive_poacher_sprites, event_log, panel_rect, font, title_font)
         
         pygame.display.flip()
         

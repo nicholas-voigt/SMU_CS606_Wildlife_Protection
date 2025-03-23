@@ -4,7 +4,7 @@
 import pygame
 from settings import WIDTH, HEIGHT
 
-def render_info_panel(screen, drones, animals, poachers, panel_rect, font, title_font):
+def render_info_panel(screen, drones, animals, poachers, event_log, panel_rect, font, title_font):
     """Render the information panel showing agent states and details"""
     # Fill panel background with a slightly lighter color
     pygame.draw.rect(screen, (50, 50, 50), panel_rect)
@@ -64,3 +64,19 @@ def render_info_panel(screen, drones, animals, poachers, panel_rect, font, title
         screen.blit(state_text, (panel_rect.left + 20, y_offset + 20))
         screen.blit(target_text, (panel_rect.left + 20, y_offset + 40))
         y_offset += 70
+    
+    # Add event log section
+    if event_log:
+        y_offset += 20  # Add space between previous content and event log
+        
+        # Event log title
+        title_text = title_font.render("Event log", True, (255, 255, 255))
+        screen.blit(title_text, (panel_rect.x + 10, panel_rect.y + y_offset))
+        y_offset += 30
+        
+        # Display events (newest at the top)
+        for event_text, timestamp in list(event_log)[-10:]:  # Show last 10 events
+            time_str = f"{timestamp//1000:02d}:{(timestamp%1000)//10:02d}"  # Format as MM:SS
+            log_entry = font.render(f"{time_str} - {event_text}", True, (200, 200, 200))
+            screen.blit(log_entry, (panel_rect.x + 10, panel_rect.y + y_offset))
+            y_offset += 20
