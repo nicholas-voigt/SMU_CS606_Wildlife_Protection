@@ -10,6 +10,7 @@ import heapq
 
 from settings import *
 from states import DroneHighAltitude, AnimalIdle, PoacherIdle
+from controller import Controller
 
 
 class Agent(pygame.sprite.Sprite):
@@ -119,7 +120,7 @@ class Drone(Agent):
     def __init__(self, name, x, y):
         super().__init__(name=name, x=x, y=y, color=DRONE_COLOR)
         self.type = 'Drone'
-        self.controller = DroneController(self)
+        self.controller = Controller(self)
         self.base_speed = DRONE_SPEED
         self.scan_range = DRONE_SCAN_RANGE
         # Set initial state
@@ -143,7 +144,6 @@ class Animal(Agent):
     def __init__(self, name, x, y):
         super().__init__(name=name, x=x, y=y, color=ANIMAL_COLOR)
         self.type = 'Animal'
-        self.controller = AnimalController(self)
         self.base_speed = ANIMAL_SPEED
         self.scan_range = ANIMAL_SCAN_RANGE
         self.threat_range = ANIMAL_THREAT_RANGE
@@ -156,7 +156,6 @@ class Poacher(Agent):
     def __init__(self, name, x, y):
         super().__init__(name=name, x=x, y=y, color=POACHER_COLOR)  
         self.type = 'Poacher'
-        self.controller = PoacherController(self)
         self.base_speed = POACHER_SPEED
         self.scan_range = POACHER_SCAN_RANGE
         self.attack_range = 30
