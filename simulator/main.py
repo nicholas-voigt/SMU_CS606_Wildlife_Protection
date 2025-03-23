@@ -4,21 +4,34 @@
 
 import sys
 import pygame
+
+from settings import WIDTH, GAME_WIDTH, PANEL_WIDTH, HEIGHT, FPS
+from game_env import render_info_panel
 from events import POACHER_KILLED_ANIMAL, DRONE_DETECTED_POACHER, DRONE_CAUGHT_POACHER, DRONE_DETECTED_ANIMAL, DRONE_LOST_POACHER, DRONE_LOST_ANIMAL
 from agents import Drone, Animal, Poacher
 from states import Terminal, DroneHighAltitude, DroneLowAltitude
-from settings import WIDTH, HEIGHT, FPS
 from pso_optimizer import PSOOptimizer
 from rl_optimizer import RLOptimizer
 
 
 # Main game loop
 def run(optimizer_type='pso'):
+    
     # Pygame setup
+    # Initialize pygame
     pygame.init()
+    # Set up the display
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Wildlife Protection Simulator") 
     clock = pygame.time.Clock()
+    # Create rectangles for game area and panel
+    game_rect = pygame.Rect(0, 0, GAME_WIDTH, HEIGHT)
+    panel_rect = pygame.Rect(GAME_WIDTH, 0, PANEL_WIDTH, HEIGHT)
+    # Initialize fonts
+    pygame.font.init()
+    font = pygame.font.SysFont('Arial', 16)
+    title_font = pygame.font.SysFont('Arial', 20, bold=True)
+
     
     # Select optimizer based on type
     if optimizer_type.lower() == "pso":
@@ -179,10 +192,17 @@ def run(optimizer_type='pso'):
 
         # Update screen
         clock.tick(FPS)
-        screen.fill((30, 30, 30))  # Background color
+        screen.fill((30, 30, 30))  # Fill the entire screen with background color
+        
+        # Draw all sprites (they will only be visible in the game area)
         all_sprites.draw(screen)
+        
+        # Render information panel
+        render_info_panel(screen, drones_sprites, alive_animal_sprites, 
+                         alive_poacher_sprites, panel_rect, font, title_font)
+        
         pygame.display.flip()
-
+        
     pygame.quit()
 
 

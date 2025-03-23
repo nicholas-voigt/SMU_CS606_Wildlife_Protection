@@ -1,7 +1,10 @@
 # Define parameters for game environment and simulation
 
 # Pygame Settings
-WIDTH, HEIGHT = 800, 600
+GAME_WIDTH = 800
+PANEL_WIDTH = 300
+WIDTH = GAME_WIDTH + PANEL_WIDTH
+HEIGHT = 600
 FPS = 60
 
 # Colors
