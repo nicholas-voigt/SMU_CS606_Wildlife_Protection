@@ -150,7 +150,7 @@ def run(optimizer_type='pso'):
             detected_agents = drone.scan_surroundings(agents=animals_sprites, mode='all')
                 
             # Add detected animals to the global list
-            for agent in detected_agents:
+            for (_, _, agent) in detected_agents:
                 detected_animal_sprites.add(agent)
             
             # If drone state is Low Altitude, also check for poachers
@@ -159,7 +159,7 @@ def run(optimizer_type='pso'):
                 detected_agents = drone.scan_surroundings(agents=poachers_sprites, mode='all')
                 
                 # Add detected poachers to the global list
-                for agent in detected_agents:
+                for (_, _, agent) in detected_agents:
                     detected_poacher_sprites.add(agent)
         
         # Get drone actions from optimizer
