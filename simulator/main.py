@@ -52,8 +52,8 @@ def run(optimizer_type='pso'):
     event_log.append(("Simulation started", pygame.time.get_ticks()))
 
     # Create agents
-    drones =  [Drone('good boy', 100, 100)]
-    animals = [Animal('elephant', 400, 300), Animal('giraffe', 420, 320)]
+    drones = [Drone('good boy1', 100, 100), Drone('good boy2', 100, 100), Drone('good boy3', 100, 100)]
+    animals = [Animal('elephant1', 400, 300), Animal('elephant2', 410, 300), Animal('giraffe1', 400, 310), Animal('giraffe2', 410, 310)]
     poachers = [Poacher('bad boy', 600, 400)]
 
     # drones = [Drone('good boy', 100, 100)]

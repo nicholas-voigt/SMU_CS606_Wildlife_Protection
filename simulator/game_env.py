@@ -15,56 +15,69 @@ def render_info_panel(screen, drones, animals, poachers, event_log, panel_rect, 
     screen.blit(title, (panel_rect.left + 10, 10))
     
     y_offset = 50  # Starting y position for text
+    table_width = panel_rect.width - 20
     
-    # Display drone information
-    drone_title = title_font.render("Drones:", True, (100, 200, 255))
-    screen.blit(drone_title, (panel_rect.left + 10, y_offset))
-    y_offset += 30
+    # Helper function to render a table
+    def render_table(title_text, headers, data, row_height=25):
+        nonlocal y_offset
+        
+        # Render section title
+        section_title = title_font.render(title_text, True, (255, 255, 255))
+        screen.blit(section_title, (panel_rect.left + 10, y_offset))
+        y_offset += 30
+        
+        if not data:
+            empty_text = font.render(f"No {title_text.lower()} active", True, (200, 200, 200))
+            screen.blit(empty_text, (panel_rect.left + 20, y_offset))
+            y_offset += 30
+            return
+        
+        # Calculate column widths
+        col_widths = [table_width // len(headers)] * len(headers)
+
+        # Render headers
+        for i, header in enumerate(headers):
+            x_pos = panel_rect.left + 10 + sum(col_widths[:i])
+            header_text = font.render(header, True, (200, 200, 200))
+            screen.blit(header_text, (x_pos, y_offset))
+        
+        y_offset += row_height
+        
+        # Draw header separator line
+        pygame.draw.line(screen, (150, 150, 150), 
+                            (panel_rect.left + 10, y_offset - 5), 
+                            (panel_rect.left + 10 + table_width, y_offset - 5), 1)
+        
+        # Render data rows
+        for row_data in data:
+            for i, cell in enumerate(row_data):
+                x_pos = panel_rect.left + 10 + sum(col_widths[:i])
+                cell_text = font.render(str(cell), True, (255, 255, 255))
+                screen.blit(cell_text, (x_pos, y_offset))
+            y_offset += row_height
+        
+        y_offset += 15  # Add space after table
+
     
-    if len(drones) == 0:
-        text = font.render("No drones active", True, (200, 200, 200))
-        screen.blit(text, (panel_rect.left + 20, y_offset))
-        y_offset += 25
-    else:
-        for drone in drones:
-            name_text = font.render(f"Name: {drone.name}", True, (255, 255, 255))
-            state_text = font.render(f"State: {drone.active_state.__class__.__name__}", True, (255, 255, 255))
-            screen.blit(name_text, (panel_rect.left + 20, y_offset))
-            screen.blit(state_text, (panel_rect.left + 20, y_offset + 20))
-            y_offset += 50
+    # Render drone table
+    drone_data = [(drone.name, drone.active_state.__class__.__name__) for drone in drones]
+    render_table("Drones", ["Name", "State"], drone_data)
     
-    y_offset += 10
+    # Render animal table
+    animal_data = [(animal.name, 
+                   animal.active_state.__class__.__name__,
+                   'Yes' if hasattr(animal, 'threat') and animal.threat else 'None') 
+                  for animal in animals]
+    render_table("Animals", ["Name", "State", "Threat"], animal_data)
     
-    # Display animal information
-    animal_title = title_font.render("Animals:", True, (100, 255, 100))
-    screen.blit(animal_title, (panel_rect.left + 10, y_offset))
-    y_offset += 30
-    
-    for animal in animals:
-        name_text = font.render(f"Name: {animal.name}", True, (255, 255, 255))
-        state_text = font.render(f"State: {animal.active_state.__class__.__name__}", True, (255, 255, 255))
-        threat_text = font.render(f"Threat: {'Yes' if hasattr(animal, 'threat') and animal.threat else 'None'}", True, (255, 255, 255))
-        screen.blit(name_text, (panel_rect.left + 20, y_offset))
-        screen.blit(state_text, (panel_rect.left + 20, y_offset + 20))
-        screen.blit(threat_text, (panel_rect.left + 20, y_offset + 40))
-        y_offset += 70
-    
-    y_offset += 10
-    
-    # Display poacher information
-    poacher_title = title_font.render("Poachers:", True, (255, 100, 100))
-    screen.blit(poacher_title, (panel_rect.left + 10, y_offset))
-    y_offset += 30
-    
-    for poacher in poachers:
-        name_text = font.render(f"Name: {poacher.name}", True, (255, 255, 255))
-        state_text = font.render(f"State: {poacher.active_state.__class__.__name__}", True, (255, 255, 255))
-        target_text = font.render(f"Target: {'Yes' if hasattr(poacher, 'target') and poacher.target else 'None'}", True, (255, 255, 255))
-        screen.blit(name_text, (panel_rect.left + 20, y_offset))
-        screen.blit(state_text, (panel_rect.left + 20, y_offset + 20))
-        screen.blit(target_text, (panel_rect.left + 20, y_offset + 40))
-        y_offset += 70
-    
+    # Render poacher table
+    poacher_data = [(poacher.name,
+                    poacher.active_state.__class__.__name__,
+                    'Yes' if hasattr(poacher, 'target') and poacher.target else 'None')
+                   for poacher in poachers]
+    render_table("Poachers", ["Name", "State", "Target"], poacher_data)
+
+        
     # Add event log section
     if event_log:
         y_offset += 20  # Add space between previous content and event log
