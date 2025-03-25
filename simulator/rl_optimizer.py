@@ -1,131 +1,87 @@
 import pygame
 import random
 import numpy as np
+from collections import deque
 from optimizer import DroneOptimizer
 from states import DroneHighAltitude, DroneLowAltitude
+from events import DRONE_CAUGHT_POACHER
 
 class RLOptimizer(DroneOptimizer):
     """Reinforcement Learning Optimizer for drone control"""
     
-    def __init__(self, learning_rate=0.1, discount_factor=0.9, exploration_rate=0.2):
+    def __init__(self, learning_rate=0.1, 
+                 discount_factor=0.95, 
+                 initial_exploration_rate=1.0,
+                 min_exploration_rate=0.1, 
+                 exploration_decay=0.995,
+                 catch_threshold=20):  # Added catch threshold
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
-        self.exploration_rate = exploration_rate
+        self.exploration_rate = initial_exploration_rate
+        self.min_exploration_rate = min_exploration_rate
+        self.exploration_decay = exploration_decay
+        self.catch_threshold = catch_threshold  # Distance threshold for catching poachers
         self.q_table = {}  # {state_key: {action_key: q_value}}
+        
+        # Simple experience replay buffer
+        self.replay_buffer = deque(maxlen=100)
+        
+        # State tracking for each drone
         self.previous_states = {}  # {drone_name: previous_state}
         self.previous_actions = {}  # {drone_name: previous_action}
         
-        # Add a visit counter to track how often a state has been visited
-        self.state_visits = {}  # {state_key: visit_count}
+        # Performance metrics
+        self.rewards_history = []
+        self.episode_step = 0
         
-        # Track position history for each drone
-        self.position_history = {}  # {drone_name: [last_n_positions]}
-        self.history_size = 10  # Number of positions to remember
-        
+        # Simplified action space - 8 directions × 2 altitudes
+        self.actions = []
+        for direction in [(1,0), (1,1), (0,1), (-1,1), (-1,0), (-1,-1), (0,-1), (1,-1)]:
+            for altitude in [0, 1]:  # 0=high, 1=low
+                self.actions.append((direction[0], direction[1], altitude, 1.0))  # Fixed speed
+    
     def discretize_state(self, drone, detected_animals, detected_poachers):
-        """Convert continuous state to discrete state for Q-learning"""
-        # Create a simple grid-based state representation
-        grid_size = 5  # 5x5 grid for simplicity
+        """Simplified state discretization"""
+        # Drone position in a coarser grid (4×4)
+        grid_x = min(3, max(0, int(drone.position.x / (800/4))))
+        grid_y = min(3, max(0, int(drone.position.y / (600/4))))
         
-        # Drone position in grid
-        grid_x = min(grid_size-1, max(0, int(drone.position.x / (800/grid_size))))
-        grid_y = min(grid_size-1, max(0, int(drone.position.y / (600/grid_size))))
+        # Binary detection flags (detected or not)
+        animals_detected = min(1, len(detected_animals))
+        poachers_detected = min(1, len(detected_poachers))
         
-        # Count nearby entities in each quadrant (NE, NW, SE, SW)
-        quadrants = [(0,0), (0,0), (0,0), (0,0)]  # (animals, poachers) for each quadrant
-        
-        for animal in detected_animals:
-            dx = animal.position.x - drone.position.x
-            dy = animal.position.y - drone.position.y
-            quadrant_idx = (0 if dy < 0 else 2) + (0 if dx < 0 else 1)
-            quadrants[quadrant_idx] = (quadrants[quadrant_idx][0] + 1, quadrants[quadrant_idx][1])
-            
-        for poacher in detected_poachers:
-            dx = poacher.position.x - drone.position.x
-            dy = poacher.position.y - drone.position.y
-            quadrant_idx = (0 if dy < 0 else 2) + (0 if dx < 0 else 1)
-            quadrants[quadrant_idx] = (quadrants[quadrant_idx][0], quadrants[quadrant_idx][1] + 1)
+        # Altitude state
+        altitude = 1 if isinstance(drone.active_state, DroneLowAltitude) else 0
         
         # Create state key
-        state_key = (
-            grid_x, grid_y,
-            quadrants[0][0], quadrants[0][1],
-            quadrants[1][0], quadrants[1][1],
-            quadrants[2][0], quadrants[2][1],
-            quadrants[3][0], quadrants[3][1],
-            1 if isinstance(drone.active_state, DroneLowAltitude) else 0
-        )
+        state_key = (grid_x, grid_y, animals_detected, poachers_detected, altitude)
         
         return state_key
     
-    def update_position_history(self, drone):
-        """Update the position history for a drone"""
-        if drone.name not in self.position_history:
-            self.position_history[drone.name] = []
-        
-        # Add current position to history
-        current_pos = (drone.position.x, drone.position.y)
-        self.position_history[drone.name].append(current_pos)
-        
-        # Keep only the last n positions
-        if len(self.position_history[drone.name]) > self.history_size:
-            self.position_history[drone.name].pop(0)
-    
-    def get_exploration_penalty(self, drone, state):
-        """Calculate an exploration penalty based on visit frequency and position history"""
-        # Penalty based on state visit count (logarithmic to avoid over-penalizing)
-        visit_penalty = -np.log(self.state_visits.get(state, 0) + 1) * 0.2
-        
-        # Penalty for revisiting recent positions
-        position_penalty = 0
-        if drone.name in self.position_history and len(self.position_history[drone.name]) > 0:
-            current_grid_x = int(drone.position.x / (800/5))
-            current_grid_y = int(drone.position.y / (600/5))
-            
-            # Count how many times the drone has been in the same grid cell recently
-            grid_visits = 0
-            for pos in self.position_history[drone.name]:
-                hist_grid_x = int(pos[0] / (800/5))
-                hist_grid_y = int(pos[1] / (600/5))
-                if hist_grid_x == current_grid_x and hist_grid_y == current_grid_y:
-                    grid_visits += 1
-            
-            # Penalize staying in the same grid cell
-            position_penalty = -grid_visits * 0.1
-        
-        return visit_penalty + position_penalty
-    
-    def get_reward(self, drone, detected_animals, detected_poachers):
-        """Calculate reward based on current situation"""
+    def calculate_reward(self, drone, detected_animals, detected_poachers):
+        """Simplified reward calculation"""
         reward = 0
         
-        # Reward for detecting animals
-        reward += len(detected_animals) * 1
+        # Binary rewards for detection
+        if detected_animals:
+            reward += 2
         
-        # Higher reward for detecting poachers
-        reward += len(detected_poachers) * 5
+        if detected_poachers:
+            reward += 5
+            
+            # Bonus for being close to poachers
+            for poacher in detected_poachers:
+                if drone.position.distance_to(poacher.position) < 20:
+                    reward += 3
+                    break
         
-        # Penalty for being in wrong state
+        # Simple state penalty
         if detected_poachers and not isinstance(drone.active_state, DroneLowAltitude):
-            reward -= 2  # Penalty for not being in low altitude when poachers detected
-        
-        # Get current state
-        state = self.discretize_state(drone, detected_animals, detected_poachers)
-        
-        # Add exploration penalty
-        exploration_penalty = self.get_exploration_penalty(drone, state)
-        reward += exploration_penalty
+            reward -= 2
+        elif not detected_animals and not detected_poachers and not isinstance(drone.active_state, DroneHighAltitude):
+            reward -= 1
         
         return reward
-    
-    def get_actions(self, drone):
-        """Get possible discrete actions for the drone"""
-        # 8 movement directions + 2 altitude states = 16 possible actions
-        actions = []
-        for direction in [(1,0), (1,1), (0,1), (-1,1), (-1,0), (-1,-1), (0,-1), (1,-1)]:
-            for altitude in [0, 1]:  # 0=high, 1=low
-                actions.append((direction[0], direction[1], altitude))
-        return actions
     
     def action_to_params(self, action, drone):
         """Convert discrete action to continuous parameters"""
@@ -142,60 +98,119 @@ class RLOptimizer(DroneOptimizer):
         return {
             'state': new_state,
             'direction': direction,
-            'speed_modifier': 1.0
+            'speed_modifier': action[3]  # Use the speed from the action
         }
     
+    def update_q_table(self):
+        """Simple Q-learning update"""
+        if not self.replay_buffer:
+            return
+            
+        # Just use the most recent experience
+        experience = self.replay_buffer[-1]
+        state, action, reward, next_state = experience
+        
+        # Initialize Q-values if needed
+        if state not in self.q_table:
+            self.q_table[state] = {}
+        if action not in self.q_table[state]:
+            self.q_table[state][action] = 0.0
+                
+        # Get max Q-value for next state
+        if next_state not in self.q_table or not self.q_table[next_state]:
+            next_max_q = 0
+        else:
+            next_max_q = max(self.q_table[next_state].values())
+                
+        # Update Q-value using Q-learning formula
+        current_q = self.q_table[state][action]
+        self.q_table[state][action] = current_q + self.learning_rate * (
+            reward + self.discount_factor * next_max_q - current_q
+        )
+    
+    def choose_action(self, state):
+        """Select action using epsilon-greedy policy"""
+        # Ensure state has an entry in Q-table
+        if state not in self.q_table:
+            self.q_table[state] = {}
+            
+        # Select random action (exploration)
+        if random.random() < self.exploration_rate:
+            return random.choice(self.actions)
+        
+        # Select best action (exploitation)
+        if not self.q_table[state]:
+            return random.choice(self.actions)
+        else:
+            return max(self.q_table[state], key=self.q_table[state].get)
+    
     def optimize(self, drones, detected_animals, detected_poachers):
+        """Simplified optimization logic"""
         drone_actions = {}
+        self.episode_step += 1
+        
+        # Decay exploration periodically
+        if self.episode_step >= 100:
+            self.episode_step = 0
+            self.exploration_rate = max(
+                self.min_exploration_rate, 
+                self.exploration_rate * self.exploration_decay
+            )
         
         for drone in drones:
+            # Check if drone can catch any poachers (NEW CODE)
+            if isinstance(drone.active_state, DroneLowAltitude):  # Only catch in low altitude
+                for poacher in detected_poachers:
+                    if drone.position.distance_to(poacher.position) < self.catch_threshold:
+                        # Post the caught poacher event
+                        catch_event = pygame.event.Event(DRONE_CAUGHT_POACHER, {'poacher': poacher})
+                        pygame.event.post(catch_event)
+                        # Add extra reward for catching a poacher
+                        if drone.name in self.previous_states:
+                            self.rewards_history.append(10)  # Big reward for catch
+                        break
+            
             # Get current state
-            state = self.discretize_state(drone, detected_animals, detected_poachers)
+            current_state = self.discretize_state(drone, detected_animals, detected_poachers)
             
-            # Get reward if we have a previous state
+            # Process previous experience if available
             if drone.name in self.previous_states:
-                reward = self.get_reward(drone, detected_animals, detected_poachers)
+                prev_state = self.previous_states[drone.name]
+                prev_action = self.previous_actions[drone.name]
                 
-                # Q-learning update
-                old_state = self.previous_states[drone.name]
-                old_action = self.previous_actions[drone.name]
+                # Calculate reward
+                reward = self.calculate_reward(drone, detected_animals, detected_poachers)
                 
-                # Initialize Q-values if needed
-                if old_state not in self.q_table:
-                    self.q_table[old_state] = {}
-                if old_action not in self.q_table[old_state]:
-                    self.q_table[old_state][old_action] = 0.0
-                    
-                # Get max Q-value for current state
-                if state not in self.q_table:
-                    self.q_table[state] = {}
-                max_q = max([0] + list(self.q_table[state].values())) if self.q_table[state] else 0
+                # Store experience and update Q-table immediately
+                self.replay_buffer.append((prev_state, prev_action, reward, current_state))
+                self.update_q_table()
                 
-                # Update Q-value
-                self.q_table[old_state][old_action] += self.learning_rate * (
-                    reward + self.discount_factor * max_q - self.q_table[old_state][old_action]
-                )
+                # Track rewards
+                self.rewards_history.append(reward)
             
-            # Choose action (exploration vs exploitation)
-            actions = self.get_actions(drone)
-            if state not in self.q_table:
-                self.q_table[state] = {}
-                
-            if random.random() < self.exploration_rate:
-                # Exploration: random action
-                action = random.choice(actions)
-            else:
-                # Exploitation: best known action
-                if not self.q_table[state]:
-                    action = random.choice(actions)
-                else:
-                    action = max(self.q_table[state], key=self.q_table[state].get)
+            # Choose next action
+            action = self.choose_action(current_state)
             
             # Store state and action for next update
-            self.previous_states[drone.name] = state
+            self.previous_states[drone.name] = current_state
             self.previous_actions[drone.name] = action
             
             # Convert action to drone parameters
             drone_actions[drone] = self.action_to_params(action, drone)
             
         return drone_actions
+        
+    def get_performance_metrics(self):
+        """Return basic performance metrics for monitoring"""
+        if not self.rewards_history:
+            return {"avg_reward": 0, "exploration_rate": self.exploration_rate}
+            
+        # Calculate average reward over last 50 steps
+        recent_rewards = self.rewards_history[-50:] if len(self.rewards_history) > 50 else self.rewards_history
+        avg_reward = sum(recent_rewards) / len(recent_rewards)
+        
+        return {
+            "avg_reward": avg_reward,
+            "exploration_rate": self.exploration_rate,
+            "q_table_size": len(self.q_table)
+        }

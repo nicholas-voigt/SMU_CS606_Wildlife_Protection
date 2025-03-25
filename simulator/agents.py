@@ -184,5 +184,14 @@ class Poacher(Agent):
         self.attack_duration = POACHER_ATTACK_DURATION
         self.kill_range = POACHER_KILL_RANGE
         self.target = None
+        
+        # New memory capabilities for smarter hunting
+        self.memory = []  
+        self.memory_capacity = 3  # Remember last 3 sightings
+        self.memory_timeout = 5000  # Memory expires after 5000 frames (adjust as needed)
+        self.last_seen_position = None
+        self.detection_cooldown = 0  # Cooldown timer between detections
+        self.current_hotspot = None  # Current hotspot target
+        
         # Set initial state
         self.set_state(PoacherIdle())
