@@ -33,6 +33,7 @@ ANIMAL_SCAN_RANGE = 100
 
 # Additional Parameters
 ANIMAL_THREAT_RANGE = 50
+ANIMAL_SEPARATION = 20
 
 ANIMAL_HOTSPOTS = [
     (200, 300),  # Water hole

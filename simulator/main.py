@@ -46,19 +46,15 @@ def run(optimizer_type='pso'):
     else:
         raise ValueError(f"Unknown optimizer type: {optimizer_type}")
     
+    
     # Event log for displaying recent events (max 15 events)
     event_log = deque(maxlen=15)
-    # Add initial message
     event_log.append(("Simulation started", pygame.time.get_ticks()))
 
     # Create agents
     drones = [Drone('good boy1', 100, 100), Drone('good boy2', 100, 100), Drone('good boy3', 100, 100)]
     animals = [Animal('elephant1', 400, 300), Animal('elephant2', 410, 300), Animal('giraffe1', 400, 310), Animal('giraffe2', 410, 310)]
     poachers = [Poacher('bad boy', 600, 400)]
-
-    # drones = [Drone('good boy', 100, 100)]
-    # animals = [Animal('elephant', 400, 300), Animal(420, 320)]
-    # poachers = [Poacher('bad boy', 600, 400)]
 
     all_sprites = pygame.sprite.Group(drones + animals + poachers)
     
@@ -89,26 +85,16 @@ def run(optimizer_type='pso'):
             
             # animal killed by poacher
             if event.type == POACHER_KILLED_ANIMAL:
-                """
-                # animal = event.animal
-                animal = event.dict['animal']
-                animal.set_state(Terminal())
-                alive_animal_sprites.remove(animal)
-                event_log.append((f"Poacher {event.poacher.name} killed {animal.name}", pygame.time.get_ticks()))
-                if len(alive_animal_sprites) == 0:
-                    event_log.append(("Game Over! Poachers have killed all animals", pygame.time.get_ticks()))
-                    running = False
-                """
                 
-                # Get animal and poacher properly from event dictionary
+                # Get animal and poacher from event dictionary
                 animal = event.dict['animal']
-                poacher = event.dict['poacher']  # Correct access to poacher from the event dictionary
+                poacher = event.dict['poacher']
                 
-                # Create an instance of Terminal state
+                # Create an instance of Terminal state & set animal to terminal state
                 terminal_state = Terminal()
-                
-                # Set animal to terminal state and remove from alive sprites
                 animal.set_state(terminal_state)
+                
+                # Remove animal from alive sprites
                 alive_animal_sprites.remove(animal)
                 
                 # Log the event (fixed to use poacher from event.dict)
@@ -120,26 +106,16 @@ def run(optimizer_type='pso'):
                     running = False
                 
             # poacher caught by drone
-            """
             if event.type == DRONE_CAUGHT_POACHER:
-                # poacher = event.poacher
-                poacher = event.dict['poacher']
-                poacher.set_state(Terminal())
-                alive_poacher_sprites.remove(poacher)
-                if len(alive_poacher_sprites) == 0:
-                    event_log.append(("Congratulations! All poachers have been caught", pygame.time.get_ticks()))
-                    running = False
-            """
-            
-            if event.type == DRONE_CAUGHT_POACHER:
+                
                 # Get the poacher from the event dictionary
                 poacher = event.dict['poacher']
                 
-                # Create an instance of Terminal state
+                # Create an instance of Terminal state & set poacher to terminal state
                 terminal_state = Terminal()
-                
-                # Set poacher to terminal state and remove from alive sprites
                 poacher.set_state(terminal_state)
+                
+                # Remove poacher from alive sprites
                 alive_poacher_sprites.remove(poacher)
                 
                 # Log the event
@@ -193,6 +169,9 @@ def run(optimizer_type='pso'):
 
             # Update threat
             animal.threat = detected_agent[2] if detected_agent else None
+            
+            # Update my current herd
+            animal.herd = [a[2] for a in animal.scan_surroundings(agents=alive_animal_sprites, mode='all')]
             
             # Check state transitions
             state = animal.active_state.check_transition()

@@ -59,7 +59,7 @@ class Agent(pygame.sprite.Sprite):
         self.active_state.enter(agent=self)
         return
     
-    def move(self, vector, speed=None, mode='direction'):
+    def move(self, vector: pygame.Vector2, speed=None, mode='direction'):
         """
         Move agent to the given position if within speed range, else on a vector towards it.
         Args:
@@ -67,7 +67,7 @@ class Agent(pygame.sprite.Sprite):
             speed: int, speed to move with if specified
             mode: str, 'direction' or 'position', whether vector is a direction or a position
         """
-        velocity = speed if speed else self.base_speed * self.active_state.speed_modifier
+        velocity = speed if speed is not None else self.base_speed * self.active_state.speed_modifier
         
         # If vector is a position, calculate the direction vector
         if mode == 'position':
@@ -82,15 +82,15 @@ class Agent(pygame.sprite.Sprite):
             # Calculate the direction vector to the target position
             else:
                 direction = pygame.Vector2(vector - self.position)
-                direction.normalize()
+                direction.normalize_ip()
                 
                 # Move the agent in the direction of the target position
                 self.position += direction * velocity
         
         # If vector is a direction, move the agent in that direction
         elif mode == 'direction':
-            direction = vector.normalize() if vector.length() > 1 else vector
-            self.position += direction * velocity
+            vector.normalize_ip()
+            self.position += vector * velocity
         
         else:
             raise ValueError(f"Invalid mode: {mode}")
@@ -120,6 +120,10 @@ class Agent(pygame.sprite.Sprite):
 
         # Check each agent in the list
         for agent in agents:
+            
+            # Skip self
+            if agent == self:
+                continue
 
             # Calculate the distance to the agent
             distance = self.position.distance_to(agent.position)
@@ -166,9 +170,11 @@ class Animal(Agent):
     def __init__(self, name, x, y):
         super().__init__(name=name, x=x, y=y, color=ANIMAL_COLOR)
         self.type = 'Animal'
+        self.herd = None
         self.base_speed = ANIMAL_SPEED
         self.scan_range = ANIMAL_SCAN_RANGE
         self.threat_range = ANIMAL_THREAT_RANGE
+        self.separation = ANIMAL_SEPARATION
         self.threat = None
         # Set initial state
         self.set_state(AnimalIdle())

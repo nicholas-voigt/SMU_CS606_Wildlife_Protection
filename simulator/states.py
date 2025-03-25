@@ -67,14 +67,50 @@ class AnimalIdle(State):
     def __init__(self):
         super().__init__(speed_modifier=0.3)
         self.herd_cohesion=0.8
+        self.separation_weight = 1.2
+        self.random_weight = 0.3
         
     def action(self):
-        # Random grazing movement, tendency to stay with herd,
-        # TODO: Implement herd cohesion
+        # Random grazing movement, tendency to stay with herd
+        # No herd members, move randomly
+        if not self.agent.herd:
+            direction = pygame.Vector2(random.randint(-1, 1), random.randint(-1, 1))
+
+        # If herd members are present, calculate cohesion and separation vectors
+        else:
+            cohesion_vector = pygame.Vector2(0, 0)
+            herd_center = pygame.Vector2(0, 0)
+            separation_vector = pygame.Vector2(0, 0)
+            random_vector = pygame.Vector2(random.uniform(-1, 1), random.uniform(-1, 1))
             
-        # Set direction to move in as random
-        direction = pygame.Vector2(random.randint(-1, 1), random.randint(-1, 1))
-        
+            # Calculate vectors for each herd member            
+            for animal in self.agent.herd:
+                # Calculate herd center for cohesion vector
+                herd_center += animal.position
+                
+                # Check distance to animal for separation vector
+                distance = self.agent.position.distance_to(animal.position)
+                if distance < self.agent.separation:
+                    
+                    # Move away from the other animal
+                    away_vector = self.agent.position - animal.position
+                    if away_vector.length() > 0:
+
+                        # The closer the other animal, the stronger the separation force
+                        separation_vector += away_vector / max(1, distance)
+
+            # Calculate cohesion vector from herd center
+            cohesion_vector = herd_center / len(self.agent.herd) - self.agent.position
+            if cohesion_vector.length() > 0:
+                cohesion_vector.normalize_ip()
+            
+            # Combine all vectors with their weights
+            direction = (
+                cohesion_vector * self.herd_cohesion +
+                separation_vector * self.separation_weight +
+                random_vector * self.random_weight
+                )
+
         # Move agent in the given direction
         self.agent.move(direction, mode='direction')
         return
