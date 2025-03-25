@@ -82,15 +82,21 @@ class Agent(pygame.sprite.Sprite):
             # Calculate the direction vector to the target position
             else:
                 direction = pygame.Vector2(vector - self.position)
-                direction.normalize_ip()
                 
-                # Move the agent in the direction of the target position
-                self.position += direction * velocity
+                # Check if direction has zero length before normalizing
+                if direction.length() > 0:
+                    direction.normalize_ip()
+                    
+                    # Move the agent in the direction of the target position
+                    self.position += direction * velocity
         
         # If vector is a direction, move the agent in that direction
         elif mode == 'direction':
-            vector.normalize_ip()
-            self.position += vector * velocity
+            
+            # Check if direction has zero length before normalizing
+            if vector.length() > 0:
+                vector.normalize_ip()
+                self.position += vector * velocity
         
         else:
             raise ValueError(f"Invalid mode: {mode}")

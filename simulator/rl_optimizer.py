@@ -145,7 +145,6 @@ class RLOptimizer(DroneOptimizer):
             return max(self.q_table[state], key=self.q_table[state].get)
     
     def optimize(self, drones, detected_animals, detected_poachers):
-        """Simplified optimization logic"""
         drone_actions = {}
         self.episode_step += 1
         
@@ -158,22 +157,31 @@ class RLOptimizer(DroneOptimizer):
             )
         
         for drone in drones:
-            # Check if drone can catch any poachers (NEW CODE)
+            # Check if drone can catch any poachers - with probability based on distance
             if isinstance(drone.active_state, DroneLowAltitude):  # Only catch in low altitude
                 for poacher in detected_poachers:
-                    if drone.position.distance_to(poacher.position) < self.catch_threshold:
-                        # Post the caught poacher event
-                        catch_event = pygame.event.Event(DRONE_CAUGHT_POACHER, {'poacher': poacher})
-                        pygame.event.post(catch_event)
-                        # Add extra reward for catching a poacher
-                        if drone.name in self.previous_states:
-                            self.rewards_history.append(10)  # Big reward for catch
-                        break
+                    distance = drone.position.distance_to(poacher.position)
+                    
+                    # Calculate catch probability - highest when very close, decreasing as distance increases
+                    # The closer to the threshold, the lower the probability
+                    if distance < self.catch_threshold:
+                        catch_probability = 1.0 - (distance / self.catch_threshold) * 0.8
+                        
+                        # Roll the dice to see if catch succeeds
+                        if random.random() < catch_probability:
+                            # Post the caught poacher event
+                            catch_event = pygame.event.Event(DRONE_CAUGHT_POACHER, {'poacher': poacher})
+                            pygame.event.post(catch_event)
+                            # Add extra reward for catching a poacher
+                            if drone.name in self.previous_states:
+                                self.rewards_history.append(10)  # Big reward for catch
+                            break
             
+            # Rest of the method remains unchanged
             # Get current state
             current_state = self.discretize_state(drone, detected_animals, detected_poachers)
             
-            # Process previous experience if available
+            # Process previous experience if availables
             if drone.name in self.previous_states:
                 prev_state = self.previous_states[drone.name]
                 prev_action = self.previous_actions[drone.name]

@@ -164,6 +164,7 @@ class AnimalFleeing(State):
 class PoacherIdle(State):
     def __init__(self):
         super().__init__(speed_modifier=0.5, scan_range_modifier=1.0, detection_probability=1.0)
+        self.current_hotspot = None
     
     """    
     def action(self):
@@ -174,13 +175,6 @@ class PoacherIdle(State):
         # Move agent in the given direction
         self.agent.move(direction, mode='direction')
         return
-    
-    def check_transition(self):
-        # Check if agent has a target & transition to Hunting state
-        if self.agent.target:
-            return PoacherHunting()
-        
-        return None  # Transition to dead state triggered by event and not self-check
     """
     
     def action(self):
@@ -198,7 +192,7 @@ class PoacherIdle(State):
                 return
         
         # If no valid memories, check hotspots
-        if hasattr(self, 'current_hotspot') and self.current_hotspot is not None:
+        if self.current_hotspot is not None:
             # Continue moving to current hotspot
             hotspot_position = pygame.Vector2(ANIMAL_HOTSPOTS[self.current_hotspot])
             if self.agent.position.distance_to(hotspot_position) < 20:
@@ -218,7 +212,14 @@ class PoacherIdle(State):
             math.sin(math.radians(angle))
         )
         self.agent.move(direction, mode='direction')
-     
+    
+    def check_transition(self):
+        # Check if agent has a target & transition to Hunting state
+        if self.agent.target is not None:
+            return PoacherHunting()
+        
+        return None  # Transition to dead state triggered by event and not self-check
+
 
 class PoacherHunting(State):
     def __init__(self):
@@ -268,7 +269,7 @@ class PoacherHunting(State):
         else:
             return PoacherIdle()
 
-
+"""
 class PoacherAttacking(State):
     def __init__(self):
         super().__init__(speed_modifier=1.5, scan_range_modifier=1.0, detection_probability=1.0)
@@ -310,7 +311,62 @@ class PoacherAttacking(State):
             
         # Transition to Idle state if target is lost or dead  --> target = None
         return PoacherIdle()
+"""
 
+class PoacherAttacking(State):
+    def __init__(self):
+        super().__init__(speed_modifier=1.0, scan_range_modifier=1.0, detection_probability=1.0)
+        self.attack_time = 0
+        self.attack_success_counter = 0  # Track successful attack frames
+        
+    def action(self):
+        # Direct attack on animal
+        self.attack_time += 1
+
+        # Check if animal is in kill range
+        distance = self.agent.position.distance_to(self.agent.target.position)
+        if distance < self.agent.kill_range:
+            # Increase attack counter - attack needs to be maintained for a few frames
+            self.attack_success_counter += 1
+            
+            # Only kill after sustained attack (avoids instant kills/jumps)
+            if self.attack_success_counter >= 1:  # Require 3 consecutive frames in kill range
+                # Calculate kill probability based on distance
+                # kill_probability = 0.9 - (distance / self.agent.kill_range) * 0.5 # original with 3x kill
+                kill_probability = 0.25 - (distance / self.agent.kill_range) * 0.2 # lower probability but 1x kill
+                
+                # Roll the dice to see if kill succeeds
+                if random.random() < kill_probability:
+                    # Create and post kill event
+                    kill_event = pygame.event.Event(POACHER_KILLED_ANIMAL, {'animal': self.agent.target, 'poacher': self.agent})
+                    pygame.event.post(kill_event)
+                    
+                    # Set target to None
+                    self.agent.target = None
+                    self.attack_success_counter = 0
+        else:
+            # Reset attack counter if animal moves out of range
+            self.attack_success_counter = 0
+            # If animal is not in kill range, move towards animal
+            self.agent.move(self.agent.target.position, mode='position')
+        return
+    
+    def check_transition(self):
+        # Check if agent still has a target
+        if self.agent.target:
+            # Check distance to target
+            distance = self.agent.position.distance_to(self.agent.target.position)
+            
+            # If target is in attack range, stay in Attacking state
+            if distance < self.agent.attack_range:
+                return None
+            
+            # If target is out of attack range, transition back to Hunting state
+            else:
+                return PoacherHunting()
+            
+        # Transition to Idle state if target is lost or dead  --> target = None
+        return PoacherIdle()
     
 class Terminal(State):
     def __init__(self):

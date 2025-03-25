@@ -53,7 +53,8 @@ def run(optimizer_type='pso'):
 
     # Create agents
     drones = [Drone('good boy1', 100, 100), Drone('good boy2', 100, 100), Drone('good boy3', 100, 100)]
-    animals = [Animal('elephant1', 400, 300), Animal('elephant2', 410, 300), Animal('giraffe1', 400, 310), Animal('giraffe2', 410, 310)]
+    # animals = [Animal('elephant1', 400, 300), Animal('elephant2', 410, 300), Animal('giraffe1', 400, 310), Animal('giraffe2', 410, 310)]
+    animals = [Animal('elephant1', 400, 300), Animal('elephant2', 410, 300)]
     poachers = [Poacher('bad boy', 600, 400)]
 
     all_sprites = pygame.sprite.Group(drones + animals + poachers)
@@ -71,6 +72,10 @@ def run(optimizer_type='pso'):
     # Handle drone search globally since drones can communicate
     detected_animal_sprites = pygame.sprite.Group()
     detected_poacher_sprites = pygame.sprite.Group()
+
+    # Game state flags
+    victory_screen = False
+    defeat_screen = False
 
     # Main loop
     running = True
@@ -103,7 +108,9 @@ def run(optimizer_type='pso'):
                 # Check if all animals are dead to end the game
                 if len(alive_animal_sprites) == 0:
                     event_log.append(("Game Over! Poachers have killed all animals", pygame.time.get_ticks()))
-                    running = False
+                    # Instead of ending the simulation, activate the defeat screen
+                    defeat_screen = True
+                    continue
                 
             # poacher caught by drone
             if event.type == DRONE_CAUGHT_POACHER:
@@ -129,7 +136,8 @@ def run(optimizer_type='pso'):
                     
                     # Create a victory screen instead of immediately ending
                     victory_screen = True
-                    victory_timer = pygame.time.get_ticks()
+                    continue
+                    # victory_timer = pygame.time.get_ticks()
             
             # animal detected by drone
             if event.type == DRONE_DETECTED_ANIMAL:
@@ -140,16 +148,13 @@ def run(optimizer_type='pso'):
             if event.type == DRONE_DETECTED_POACHER:
                 # Get the poacher from the event dictionary
                 poacher = event.dict['poacher']
-                event_log.append((f"Drone caught poacher {poacher.name}", pygame.time.get_ticks()))
-                
-                # Set poacher to terminal state and remove from alive sprites
-                poacher.set_state(Terminal())
-                alive_poacher_sprites.remove(poacher)
+                detected_poacher_sprites.add(poacher) # add to detected poachers group
+                event_log.append((f"Drone detected poacher {poacher.name}", pygame.time.get_ticks()))
                 
                 # Check if all poachers are caught
                 if len(alive_poacher_sprites) == 0:
                     event_log.append(("Congratulations! All poachers have been caught", pygame.time.get_ticks()))
-                    running = False
+                    victory_screen = True
             
             # drone lost track of poacher
             if event.type == DRONE_LOST_POACHER:
@@ -161,11 +166,13 @@ def run(optimizer_type='pso'):
                 animal = event.animal
                 detected_animal_sprites.remove(animal)
         
-        # Update animals
-        for animal in alive_animal_sprites:
+        # Skip game updates if in victory or defeat screen
+        if not victory_screen and not defeat_screen:
+            # Update animals
+            for animal in alive_animal_sprites:
 
-            # Scan surroundings for poachers
-            detected_agent = animal.scan_surroundings(agents=alive_poacher_sprites, mode='nearest')
+                # Scan surroundings for poachers
+                detected_agent = animal.scan_surroundings(agents=alive_poacher_sprites, mode='nearest')
 
             # Update threat
             animal.threat = detected_agent[2] if detected_agent else None
@@ -182,86 +189,83 @@ def run(optimizer_type='pso'):
             # Perform the action of the current state
             animal.active_state.action()
 
-        # Update poachers
-        for poacher in alive_poacher_sprites:
-            
-            # Share target information among poachers
-            shared_targets = {}
+            # Update poachers
             for poacher in alive_poacher_sprites:
-                if poacher.target:
-                    shared_targets[poacher.name] = poacher.target
-
-            # Then for each poacher that doesn't have a target:
-            if not poacher.target and shared_targets:
-                # Pick a random target someone else has found
-                poacher.target = random.choice(list(shared_targets.values()))
-
-            # Scan surroundings for the closest animal
-            detected_agent = poacher.scan_surroundings(agents=alive_animal_sprites, mode='nearest')
-
-            # If poacher detected an animal, update if there is no other target
-            if detected_agent:
-                # Update target
-                poacher.target = detected_agent[2] if not poacher.target else poacher.target
                 
-                if detected_agent and not poacher.target:
-                    # Record memory of this animal sighting
-                    new_memory = {
-                        'position': detected_agent[2].position.copy(),
-                        'time': pygame.time.get_ticks()
-                    }
-                    poacher.memory.insert(0, new_memory)  # Insert at beginning (most recent)
-                    if len(poacher.memory) > poacher.memory_capacity:
-                        poacher.memory.pop()  # Remove oldest memory if capacity exceeded
-        
-            else:
-                poacher.target = None
+                # Share target information among poachers
+                shared_targets = {}
+                for poacher in alive_poacher_sprites:
+                    if poacher.target:
+                        shared_targets[poacher.name] = poacher.target
+
+                # Then for each poacher that doesn't have a target:
+                if not poacher.target and shared_targets:
+                    # Pick a random target someone else has found
+                    poacher.target = random.choice(list(shared_targets.values()))
+
+                # Scan surroundings for the closest animal
+                detected_agent = poacher.scan_surroundings(agents=alive_animal_sprites, mode='nearest')
+
+                # If poacher detected an animal, update if there is no other target
+                if detected_agent:
+                    # Update target
+                    poacher.target = detected_agent[2] if not poacher.target else poacher.target
+                    
+                    if detected_agent and not poacher.target:
+                        # Record memory of this animal sighting
+                        new_memory = {
+                            'position': detected_agent[2].position.copy(),
+                            'time': pygame.time.get_ticks()
+                        }
+                        poacher.memory.insert(0, new_memory)  # Insert at beginning (most recent)
+                        if len(poacher.memory) > poacher.memory_capacity:
+                            poacher.memory.pop()  # Remove oldest memory if capacity exceeded
             
-            # Check state transitions
-            state = poacher.active_state.check_transition()
-            if state:
-                poacher.set_state(state)
-                event_log.append((f"{poacher.name} changed state to {state.__class__.__name__}", pygame.time.get_ticks()))
-
-            # Perform the action of the current state
-            poacher.active_state.action()
-
-        # Update drones
-        # empty the global list of detected agents first and then rebuild
-        detected_animal_sprites.empty()
-        detected_poacher_sprites.empty()
-        for drone in drones_sprites:
-            # Scan surroundings for animals
-            detected_agents = drone.scan_surroundings(agents=animals_sprites, mode='all')
+                else:
+                    poacher.target = None
                 
-            # Add detected animals to the global list
-            for (_, _, agent) in detected_agents:
-                detected_animal_sprites.add(agent)
-            
-            # If drone state is Low Altitude, also check for poachers
-            if isinstance(drone.active_state, DroneLowAltitude):
-                # Scan surroundings for poachers
-                detected_agents = drone.scan_surroundings(agents=poachers_sprites, mode='all')
-                
-                # Add detected poachers to the global list
+                # Check state transitions
+                state = poacher.active_state.check_transition()
+                if state:
+                    poacher.set_state(state)
+                    event_log.append((f"{poacher.name} changed state to {state.__class__.__name__}", pygame.time.get_ticks()))
+
+                # Perform the action of the current state
+                poacher.active_state.action()
+
+            # Update drones
+            # empty the global list of detected agents first and then rebuild
+            detected_animal_sprites.empty()
+            detected_poacher_sprites.empty()
+            for drone in drones_sprites:
+                # Scan surroundings for animals
+                detected_agents = drone.scan_surroundings(agents=animals_sprites, mode='all')
+                    
+                # Add detected animals to the global list
                 for (_, _, agent) in detected_agents:
-                    detected_poacher_sprites.add(agent)
-        
-        # Get drone actions from optimizer
-        drone_actions = optimizer.optimize(drones_sprites, detected_animal_sprites, detected_poacher_sprites)
-        
-        # Apply drone actions
-        for drone, action in drone_actions.items():
-            # Update drone state if needed
-            if action['state']:
-                drone.set_state(action['state'])
-                event_log.append((f"{drone.name} changed state to {action['state'].__class__.__name__}", pygame.time.get_ticks()))
+                    detected_animal_sprites.add(agent)
+                
+                # If drone state is Low Altitude, also check for poachers
+                if isinstance(drone.active_state, DroneLowAltitude):
+                    # Scan surroundings for poachers
+                    detected_agents = drone.scan_surroundings(agents=poachers_sprites, mode='all')
+                    
+                    # Add detected poachers to the global list
+                    for (_, _, agent) in detected_agents:
+                        detected_poacher_sprites.add(agent)
             
-            # Move drone in the specified direction with specified speed
-            drone.move(action['direction'], action['speed_modifier'] * drone.base_speed)
+            # Get drone actions from optimizer
+            drone_actions = optimizer.optimize(drones_sprites, detected_animal_sprites, detected_poacher_sprites)
             
-            # You can also invoke other drone actions here based on the optimizer's output
-            
+            # Apply drone actions
+            for drone, action in drone_actions.items():
+                # Update drone state if needed
+                if action['state']:
+                    drone.set_state(action['state'])
+                    event_log.append((f"{drone.name} changed state to {action['state'].__class__.__name__}", pygame.time.get_ticks()))
+                
+                # Move drone in the specified direction with specified speed
+                drone.move(action['direction'], action['speed_modifier'] * drone.base_speed)
 
         # Update screen
         clock.tick(FPS)
@@ -294,9 +298,11 @@ def run(optimizer_type='pso'):
         
         pygame.display.flip()
         
-        
         # Check if we're in victory screen mode
-        if 'victory_screen' in locals() and victory_screen:
+        if victory_screen:
+            # Clear previous events to prevent stacking
+            pygame.event.clear()
+            
             # Display victory message in center of screen
             victory_font = pygame.font.SysFont('Arial', 32, bold=True)
             victory_text = victory_font.render("VICTORY! All poachers have been caught", True, (255, 255, 255))
@@ -318,49 +324,34 @@ def run(optimizer_type='pso'):
                     if event.type == pygame.QUIT or event.type == pygame.KEYDOWN:
                         victory_exit = True
                         running = False
-        """
-        # Check if we're in victory screen mode
-        if 'victory_screen' in locals() and victory_screen:
-            # Display victory message in center of screen
-            victory_font = pygame.font.SysFont('Arial', 32, bold=True)
-            victory_text = victory_font.render("VICTORY! All poachers have been caught", True, (255, 255, 255))
-            victory_rect = victory_text.get_rect(center=(WIDTH//2, HEIGHT//2))
-            screen.blit(victory_text, victory_rect)
+        
+        # Check if we're in defeat screen mode
+        if defeat_screen:
+            # Clear previous events to prevent stacking
+            pygame.event.clear()
             
-            # Add options
-            options = ["(1) Change optimizer", "(2) Restart", "(3) Quit"]
-            option_font = pygame.font.SysFont('Arial', 24)
-            
-            for i, option in enumerate(options):
-                option_text = option_font.render(option, True, (200, 200, 200))
-                option_rect = option_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 50 + (i * 30)))
-                screen.blit(option_text, option_rect)
-            
+            # Display defeat message in center of screen
+            defeat_font = pygame.font.SysFont('Arial', 32, bold=True)
+            defeat_text = defeat_font.render("DEFEAT! All animals have been killed", True, (255, 0, 0))
+            defeat_rect = defeat_text.get_rect(center=(WIDTH//2, HEIGHT//2))
+            screen.blit(defeat_text, defeat_rect)
+
+            # Add instruction to continue
+            continue_font = pygame.font.SysFont('Arial', 24)
+            continue_text = continue_font.render("Press any key to exit", True, (200, 200, 200))
+            continue_rect = continue_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 50))
+            screen.blit(continue_text, continue_rect)
+
             pygame.display.flip()
-            
-            # Check for keypress to handle options
-            victory_exit = False
-            while not victory_exit:
+
+            # Check for keypress to exit
+            defeat_exit = False
+            while not defeat_exit:
                 for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        victory_exit = True
+                    if event.type == pygame.QUIT or event.type == pygame.KEYDOWN:
+                        defeat_exit = True
                         running = False
-                    elif event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_1:
-                            # Change optimizer logic
-                            current_optimizer = (current_optimizer + 1) % len(optimizer_options)
-                            victory_exit = True
-                            # Reset game but keep the same optimizer
-                        elif event.key == pygame.K_2:
-                            # Restart logic
-                            victory_exit = True
-                            # Reset all game variables here
-                            reset_game()
-                        elif event.key == pygame.K_3:
-                            # Quit logic
-                            victory_exit = True
-                            running = False
-        """
+                        
     pygame.quit()
 
 
