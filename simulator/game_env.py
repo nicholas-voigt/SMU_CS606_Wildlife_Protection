@@ -93,3 +93,43 @@ def render_info_panel(screen, drones, animals, poachers, event_log, panel_rect, 
             log_entry = font.render(f"{time_str} - {event_text}", True, (200, 200, 200))
             screen.blit(log_entry, (panel_rect.x + 10, panel_rect.y + y_offset))
             y_offset += 20
+
+
+def end_simulation(screen, type):
+    """Render the end of simulation screen with the given message"""
+
+    # Clear previous events to prevent stacking
+    pygame.event.clear()
+    
+    # Rendering instructions
+    msg_font = pygame.font.SysFont('Arial', 32, bold=True)
+    instr_font = pygame.font.SysFont('Arial', 24)
+
+    if type == "Victory":
+        # Display victory message in center of screen
+        victory_text = msg_font.render("VICTORY! All poachers have been caught", True, (255, 255, 255))
+        victory_rect = victory_text.get_rect(center=(WIDTH//2, HEIGHT//2))
+        screen.blit(victory_text, victory_rect)
+
+    elif type == "Defeat":
+        # Display defeat message in center of screen
+        defeat_text = msg_font.render("DEFEAT! All animals have been killed", True, (255, 0, 0))
+        defeat_rect = defeat_text.get_rect(center=(WIDTH//2, HEIGHT//2))
+        screen.blit(defeat_text, defeat_rect)
+
+    # Add instruction to continue
+    continue_text = instr_font.render("Press any key to exit", True, (200, 200, 200))
+    continue_rect = continue_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 50))
+    screen.blit(continue_text, continue_rect)   
+    
+    pygame.display.flip()
+    
+    # Wait for key press
+    waiting = True
+    while waiting:
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                # Post a QUIT event to be handled by the main game loop
+                pygame.event.post(pygame.event.Event(pygame.QUIT))
+                waiting = False
+    return

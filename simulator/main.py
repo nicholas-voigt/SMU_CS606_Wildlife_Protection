@@ -9,7 +9,7 @@ import random
 from collections import deque
 
 from settings import WIDTH, GAME_WIDTH, PANEL_WIDTH, HEIGHT, FPS
-from game_env import render_info_panel
+from game_env import render_info_panel, end_simulation
 from events import POACHER_ATTACK_ANIMAL, ANIMAL_KILLED, DRONE_DETECTED_POACHER, DRONE_CAUGHT_POACHER, DRONE_DETECTED_ANIMAL, DRONE_LOST_POACHER, DRONE_LOST_ANIMAL
 from agents import Drone, Animal, Poacher
 from states import Terminal, DroneHighAltitude, DroneLowAltitude
@@ -82,6 +82,7 @@ def run(optimizer_type='pso'):
             # Pygame quit event
             if event.type == pygame.QUIT:
                 running = False
+                break
             
             # animal attacked by poacher
             if event.type == POACHER_ATTACK_ANIMAL:
@@ -116,8 +117,8 @@ def run(optimizer_type='pso'):
                 
                 # Check if all animals are dead to end the game
                 if len(alive_animal_sprites) == 0:
-                    event_log.append(("Game Over! Poachers have killed all animals", pygame.time.get_ticks()))
-                    running = False
+                    end_simulation(screen, "Defeat")
+                    continue  # Skip the rest of the loop since the game is over
                 
             # poacher caught by drone
             if event.type == DRONE_CAUGHT_POACHER:
@@ -125,26 +126,19 @@ def run(optimizer_type='pso'):
                 # Get the poacher from the event dictionary
                 poacher = event.dict['poacher']
                 
-                # Create an instance of Terminal state & set poacher to terminal state
-                terminal_state = Terminal()
-                poacher.set_state(terminal_state)
-                
-                # Remove poacher from alive sprites
+                # Set poacher to terminal state & remove from alive sprites
+                poacher.set_state(Terminal())
                 alive_poacher_sprites.remove(poacher)
                 
                 # Log the event
                 victory_message = f"Drone caught poacher {poacher.name}"
                 event_log.append((victory_message, pygame.time.get_ticks()))
                 
-                # Check if all poachers are caught
+                # End simulation if all poachers are caught
                 if len(alive_poacher_sprites) == 0:
-                    final_message = "Congratulations! All poachers have been caught"
-                    event_log.append((final_message, pygame.time.get_ticks()))
-                    
-                    # Create a victory screen instead of immediately ending
-                    victory_screen = True
-                    victory_timer = pygame.time.get_ticks()
-            
+                    end_simulation(screen, "Victory")
+                    continue  # Skip the rest of the loop since the game is over
+                                
             # animal detected by drone
             if event.type == DRONE_DETECTED_ANIMAL:
                 animal = event.animal
