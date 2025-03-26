@@ -16,27 +16,21 @@ ANIMAL_COLOR = (0, 255, 0)  # Green
 
 
 # Simulation Parameters
-# Speeds
+# Drone Parameters
 DRONE_SPEED = 10
-POACHER_SPEED = 5
-ANIMAL_SPEED = 2
-
-# Scan Ranges
 DRONE_SCAN_RANGE = 200
 
+# Poacher Parameters
+POACHER_SPEED = 5
 POACHER_SCAN_RANGE = 200
 POACHER_ATTACK_RANGE = 50
 POACHER_ATTACK_DURATION = 30
 POACHER_KILL_RANGE = 10
+POACHER_ATTACK_DAMAGE = 40
 
+# Animal Parameters
+ANIMAL_SPEED = 2
 ANIMAL_SCAN_RANGE = 100
-
-# Additional Parameters
 ANIMAL_THREAT_RANGE = 50
 ANIMAL_SEPARATION = 20
-
-ANIMAL_HOTSPOTS = [
-    (200, 300),  # Water hole
-    (600, 400),  # Feeding area
-    (300, 150),  # Forest clearing
-]
+ANIMAL_HEALTH = 100

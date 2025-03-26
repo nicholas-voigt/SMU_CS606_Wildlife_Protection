@@ -4,8 +4,7 @@ import pygame
 import random
 import math
 
-from events import POACHER_KILLED_ANIMAL, DRONE_DETECTED_POACHER, DRONE_CAUGHT_POACHER,DRONE_DETECTED_ANIMAL, DRONE_LOST_POACHER, DRONE_LOST_ANIMAL
-from settings import ANIMAL_HOTSPOTS
+from events import POACHER_ATTACK_ANIMAL, ANIMAL_KILLED, DRONE_DETECTED_POACHER, DRONE_CAUGHT_POACHER,DRONE_DETECTED_ANIMAL, DRONE_LOST_POACHER, DRONE_LOST_ANIMAL
 
 class State:
     def __init__(self, speed_modifier=1.0, scan_range_modifier=1.0, detection_probability=1.0):
@@ -148,10 +147,8 @@ class AnimalFleeing(State):
         # Check if agent has a threat in sight
         if self.agent.threat:
 
-            # Check distance to threat
+            # Calc distance to threat & check if close enough to keep fleeing
             distance = self.agent.position.distance_to(self.agent.threat.position)
-            
-            # If threat is close enough, stay in fleeing state
             if distance < self.agent.threat_range:
                 return None # Transition to dead state triggered by event and not self-check
         
@@ -162,17 +159,28 @@ class AnimalFleeing(State):
 
 # Poacher states
 class PoacherIdle(State):
+    """
+    Poacher idle state, tries to find animals to hunt. 
+    Uses the agents memory of prior seen animals and their locations. If memory exists, moves toward the most recent memory.
+    If no memory exists, move in strategic search pattern (expanding circles)
+    """
+    
     def __init__(self):
         super().__init__(speed_modifier=0.5, scan_range_modifier=1.0, detection_probability=1.0)
-    
-    """    
-    def action(self):
-        # Random movement, trying to find a target target search in main.py
-        # Get instructions for movement from controller
-        direction = pygame.Vector2(random.randint(-1, 1), random.randint(-1, 1))
 
-        # Move agent in the given direction
-        self.agent.move(direction, mode='direction')
+    def action(self):
+        # If memory of animal locations, move towards the most recent memory
+        if self.agent.memory:
+            # Get the most recent memory & move towards it
+            target_position = self.agent.memory[0][1]
+            self.agent.move(target_position, mode='position')
+        
+        # Follow search pattern of expanding circles
+        else:        
+            current_tick = pygame.time.get_ticks() // 60  # Change direction every 60 ticks
+            angle = current_tick % 8 * 45  # 8 directions, changing over time
+            direction = pygame.Vector2(math.cos(math.radians(angle)), math.sin(math.radians(angle)))
+            self.agent.move(direction, mode='direction')
         return
     
     def check_transition(self):
@@ -181,82 +189,29 @@ class PoacherIdle(State):
             return PoacherHunting()
         
         return None  # Transition to dead state triggered by event and not self-check
-    """
-    
-    def action(self):
-        # If we have memory of animal locations, move toward the most recent memory
-        if self.agent.memory:
-            # Get the most recent memory that hasn't expired
-            current_time = pygame.time.get_ticks()
-            valid_memories = [m for m in self.agent.memory if current_time - m['time'] < self.agent.memory_timeout]
-            
-            if valid_memories:
-                # Move toward the most recent memory
-                target_pos = valid_memories[0]['position']
-                direction = target_pos - self.agent.position
-                self.agent.move(direction, mode='direction')
-                return
-        
-        # If no valid memories, check hotspots
-        if hasattr(self, 'current_hotspot') and self.current_hotspot is not None:
-            # Continue moving to current hotspot
-            hotspot_position = pygame.Vector2(ANIMAL_HOTSPOTS[self.current_hotspot])
-            if self.agent.position.distance_to(hotspot_position) < 20:
-                # Reached hotspot, pick another one
-                self.current_hotspot = random.randint(0, len(ANIMAL_HOTSPOTS) - 1)
-            direction = hotspot_position - self.agent.position
-            self.agent.move(direction, mode='direction')
-        else:
-            # Pick a random hotspot
-            self.current_hotspot = random.randint(0, len(ANIMAL_HOTSPOTS) - 1)
-        
-        # Implement a more strategic search pattern - move in expanding circles or follow terrain features
-        current_tick = pygame.time.get_ticks() // 60  # Change direction every 60 ticks
-        angle = current_tick % 8 * 45  # 8 directions, changing over time
-        direction = pygame.Vector2(
-            math.cos(math.radians(angle)),
-            math.sin(math.radians(angle))
-        )
-        self.agent.move(direction, mode='direction')
-     
+
 
 class PoacherHunting(State):
+    """
+    Poacher hunting state, moves towards the target animal to attack it.
+    Can only be in this state if a target animal is in sight.
+    """
     def __init__(self):
         super().__init__(speed_modifier=1.0, scan_range_modifier=1.0, detection_probability=1.0)
         
-        # Poacher to follow tracks if animals flee
-        self.last_seen_position = None
-        self.tracking_time = 0
-        self.max_tracking_time = 300  # Give up after 300 frames
-        
     def action(self):
-        """
-        # Hunt the target animal
-        # Move agent towards the position of the target
-        self.agent.move(self.agent.target.position, mode='position')
-        return
-        """
-        # If target exists, update last known position and move toward it
-        if self.agent.target:
-            self.last_seen_position = self.agent.target.position.copy()
-            self.tracking_time = 0
-            self.agent.move(self.agent.target.position, mode='position')
-        # If target was lost but we have a last seen position, track it for a while
-        elif self.last_seen_position and self.tracking_time < self.max_tracking_time:
-            self.tracking_time += 1
-            self.agent.move(self.last_seen_position, mode='position')
+        # Get target position and move towards it
+        target_position = self.agent.target.position
+        self.agent.move(target_position, mode='position')
         return
         
         
     def check_transition(self):
-        # CheckCheck if agent can transition to Attacking state
-        # Check if agent has a target in range
+        # Transition options: Attacking state, Idle state
         if self.agent.target:
-
-            # Check distance to target
-            distance = self.agent.position.distance_to(self.agent.target.position)
-
+            
             # If target is in attack range, transition to attacking state
+            distance = self.agent.position.distance_to(self.agent.target.position)
             if distance < self.agent.attack_range:
                 return PoacherAttacking()
             
@@ -278,29 +233,20 @@ class PoacherAttacking(State):
         # Direct attack on animal
         self.attack_time += 1
 
-        # check if animal is in kill range
+        # if animal is in range create and post attack event
         if self.agent.position.distance_to(self.agent.target.position) < self.agent.kill_range:
-
-            # create and post kill event
-            kill_event = pygame.event.Event(POACHER_KILLED_ANIMAL, {'animal': self.agent.target, 'poacher': self.agent})
-            pygame.event.post(kill_event)
+            attack_event = pygame.event.Event(POACHER_ATTACK_ANIMAL, {'animal': self.agent.target, 'poacher': self.agent})
+            pygame.event.post(attack_event)
             
-            # set target to None
-            self.agent.target = None
-
-        # if animal is not in kill range, move towards animal
+        # if animal is not in range, move towards animal
         else:
             self.agent.move(self.agent.target.position, mode='position')
         return
     
     def check_transition(self):
-        # Check if agent still has a target
+        # Check if agent still has a target (not lost or dead) & is still in attack range
         if self.agent.target:
-
-            # Check distance to target
             distance = self.agent.position.distance_to(self.agent.target.position)
-            
-            # If target is in attack range, stay in Attacking state
             if distance < self.agent.attack_range:
                 return None
             

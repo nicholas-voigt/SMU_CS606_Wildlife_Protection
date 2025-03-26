@@ -10,7 +10,7 @@ from collections import deque
 
 from settings import WIDTH, GAME_WIDTH, PANEL_WIDTH, HEIGHT, FPS
 from game_env import render_info_panel
-from events import POACHER_KILLED_ANIMAL, DRONE_DETECTED_POACHER, DRONE_CAUGHT_POACHER, DRONE_DETECTED_ANIMAL, DRONE_LOST_POACHER, DRONE_LOST_ANIMAL
+from events import POACHER_ATTACK_ANIMAL, ANIMAL_KILLED, DRONE_DETECTED_POACHER, DRONE_CAUGHT_POACHER, DRONE_DETECTED_ANIMAL, DRONE_LOST_POACHER, DRONE_LOST_ANIMAL
 from agents import Drone, Animal, Poacher
 from states import Terminal, DroneHighAltitude, DroneLowAltitude
 from pso_optimizer import PSOOptimizer
@@ -83,19 +83,33 @@ def run(optimizer_type='pso'):
             if event.type == pygame.QUIT:
                 running = False
             
-            # animal killed by poacher
-            if event.type == POACHER_KILLED_ANIMAL:
+            # animal attacked by poacher
+            if event.type == POACHER_ATTACK_ANIMAL:
                 
                 # Get animal and poacher from event dictionary
                 animal = event.dict['animal']
                 poacher = event.dict['poacher']
                 
-                # Create an instance of Terminal state & set animal to terminal state
-                terminal_state = Terminal()
-                animal.set_state(terminal_state)
+                # Reduce animal health
+                animal.health -= poacher.attack_damage
                 
-                # Remove animal from alive sprites
+                # if animal is dead, post animal killed event
+                if animal.health <= 0:
+                    pygame.event.post(pygame.event.Event(ANIMAL_KILLED, animal=animal, poacher=poacher))
+            
+            # animal killed event
+            if event.type == ANIMAL_KILLED:
+                
+                # Get animal and poacher from event dictionary
+                animal = event.dict['animal']
+                poacher = event.dict['poacher']
+                
+                # Set animal to terminal state & remove from alive sprites
+                animal.set_state(Terminal())
                 alive_animal_sprites.remove(animal)
+                
+                # Delete target from poacher
+                poacher.target = None
                 
                 # Log the event (fixed to use poacher from event.dict)
                 event_log.append((f"Poacher {poacher.name} killed {animal.name}", pygame.time.get_ticks()))
