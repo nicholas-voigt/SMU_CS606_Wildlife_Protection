@@ -7,6 +7,7 @@
 
 import pygame
 import heapq
+from collections import deque
 
 from settings import *
 from states import DroneHighAltitude, AnimalIdle, PoacherIdle
@@ -35,6 +36,7 @@ class Agent(pygame.sprite.Sprite):
         self.base_speed = 0
         self.position = pygame.Vector2(x, y)
         self.scan_range = 0
+        self.memory = deque(maxlen=3)  # Memory queue of tuples to store last sightings (agent_type, position)
         
         # Pygame sprite setup for rendering
         self.image = pygame.Surface((10, 10))
@@ -46,7 +48,7 @@ class Agent(pygame.sprite.Sprite):
         Change the agent's state. Called from updated method after transition conditions were checked.
         Exits the current state and enters the new state.
         Args:
-            new_state: str, name of the new state
+            new_state: state object
         """
         # Exit the current state if exists (in initialization no current state)
         if self.active_state:
@@ -67,6 +69,7 @@ class Agent(pygame.sprite.Sprite):
             speed: int, speed to move with if specified
             mode: str, 'direction' or 'position', whether vector is a direction or a position
         """
+        # use given speed if specified or calculate the velocity to move with
         velocity = speed if speed is not None else self.base_speed * self.active_state.speed_modifier
         
         # If vector is a position, calculate the direction vector
@@ -79,21 +82,14 @@ class Agent(pygame.sprite.Sprite):
                 # Update the agents position to the target position
                 self.position = vector
             
-            # Calculate the direction vector to the target position
+            # Calculate the direction towards target position & move agent
             else:
                 direction = pygame.Vector2(vector - self.position)
-                
-                # Check if direction has zero length before normalizing
-                if direction.length() > 0:
-                    direction.normalize_ip()
-                    
-                    # Move the agent in the direction of the target position
-                    self.position += direction * velocity
+                direction.normalize_ip()
+                self.position += direction * velocity
         
         # If vector is a direction, move the agent in that direction
         elif mode == 'direction':
-            
-            # Check if direction has zero length before normalizing
             if vector.length() > 0:
                 vector.normalize_ip()
                 self.position += vector * velocity
@@ -157,19 +153,6 @@ class Drone(Agent):
         self.scan_range = DRONE_SCAN_RANGE
         # Set initial state
         self.set_state(DroneHighAltitude())
-    
-    # def update(self):
-    #     """Update the agent"""
-    #     # Perform the action of the current state
-    #     self.active_state.action()
-        
-    #     # Call controller to check if state transition is needed TODO: Implement controller
-    #     if self.active_state.check_transition() and self.controller.evaluate_state_transition(self):
-    #         # Transition to the new state
-    #         if isinstance(self.active_state, DroneHighAltitude):
-    #             self.set_state(self.states['LowAltitude'])
-    #         else:
-    #             self.set_state(self.states['HighAltitude'])
 
 
 class Animal(Agent):
@@ -182,6 +165,7 @@ class Animal(Agent):
         self.threat_range = ANIMAL_THREAT_RANGE
         self.separation = ANIMAL_SEPARATION
         self.threat = None
+        self.health = ANIMAL_HEALTH
         # Set initial state
         self.set_state(AnimalIdle())
             
@@ -194,16 +178,8 @@ class Poacher(Agent):
         self.scan_range = POACHER_SCAN_RANGE
         self.attack_range = POACHER_ATTACK_RANGE
         self.attack_duration = POACHER_ATTACK_DURATION
+        self.attack_damage = POACHER_ATTACK_DAMAGE
         self.kill_range = POACHER_KILL_RANGE
-        self.target = None
-        
-        # New memory capabilities for smarter hunting
-        self.memory = []  
-        self.memory_capacity = 3  # Remember last 3 sightings
-        self.memory_timeout = 5000  # Memory expires after 5000 frames (adjust as needed)
-        self.last_seen_position = None
-        self.detection_cooldown = 0  # Cooldown timer between detections
-        self.current_hotspot = None  # Current hotspot target
-        
+        self.target = None 
         # Set initial state
         self.set_state(PoacherIdle())

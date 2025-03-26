@@ -3,8 +3,10 @@
 import pygame
 
 # Define custom events for communication between agents
-# 1. Poacher has killed an animal
-POACHER_KILLED_ANIMAL = pygame.USEREVENT + 1
+# Poacher attacks an animal (event data: animal, poacher)
+POACHER_ATTACK_ANIMAL = pygame.USEREVENT + 7
+# Animal has been killed by a poacher (event data: animal, poacher)
+ANIMAL_KILLED = pygame.USEREVENT + 1
 # 2. Drone has detected a poacher
 DRONE_DETECTED_POACHER = pygame.USEREVENT + 2
 # 3. Drone has caught a poacher
