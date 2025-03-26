@@ -4,12 +4,15 @@
 import pygame
 from settings import WIDTH, HEIGHT
 
-def render_info_panel(screen, drones, animals, poachers, event_log, panel_rect, font, title_font):
+def render_info_panel(screen, drones, animals, poachers, event_log, panel_rect):
     """Render the information panel showing agent states and details"""
     # Fill panel background with a slightly lighter color
     pygame.draw.rect(screen, (50, 50, 50), panel_rect)
     pygame.draw.line(screen, (100, 100, 100), (panel_rect.left, 0), (panel_rect.left, HEIGHT), 2)
-    
+    # Set fonts
+    font = pygame.font.SysFont('Arial', 16)
+    title_font = pygame.font.SysFont('Arial', 20, bold=True)
+
     # Panel title
     title = title_font.render("Agent Information", True, (255, 255, 255))
     screen.blit(title, (panel_rect.left + 10, 10))

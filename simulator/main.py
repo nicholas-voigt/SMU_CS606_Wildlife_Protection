@@ -34,8 +34,6 @@ def run(optimizer_type='pso'):
     transparent_surface = pygame.Surface((GAME_WIDTH, HEIGHT), pygame.SRCALPHA)
     # Initialize fonts
     pygame.font.init()
-    font = pygame.font.SysFont('Arial', 16)
-    title_font = pygame.font.SysFont('Arial', 20, bold=True)
 
     
     # Select optimizer based on type
@@ -86,8 +84,6 @@ def run(optimizer_type='pso'):
             
             # animal attacked by poacher
             if event.type == POACHER_ATTACK_ANIMAL:
-                
-                # Get animal and poacher from event dictionary
                 animal = event.dict['animal']
                 poacher = event.dict['poacher']
                 
@@ -100,8 +96,6 @@ def run(optimizer_type='pso'):
             
             # animal killed event
             if event.type == ANIMAL_KILLED:
-                
-                # Get animal and poacher from event dictionary
                 animal = event.dict['animal']
                 poacher = event.dict['poacher']
                 
@@ -112,7 +106,7 @@ def run(optimizer_type='pso'):
                 # Delete target from poacher
                 poacher.target = None
                 
-                # Log the event (fixed to use poacher from event.dict)
+                # Log the event
                 event_log.append((f"Poacher {poacher.name} killed {animal.name}", pygame.time.get_ticks()))
                 
                 # Check if all animals are dead to end the game
@@ -122,8 +116,6 @@ def run(optimizer_type='pso'):
                 
             # poacher caught by drone
             if event.type == DRONE_CAUGHT_POACHER:
-                
-                # Get the poacher from the event dictionary
                 poacher = event.dict['poacher']
                 
                 # Set poacher to terminal state & remove from alive sprites
@@ -131,8 +123,7 @@ def run(optimizer_type='pso'):
                 alive_poacher_sprites.remove(poacher)
                 
                 # Log the event
-                victory_message = f"Drone caught poacher {poacher.name}"
-                event_log.append((victory_message, pygame.time.get_ticks()))
+                event_log.append((f"Drone caught poacher {poacher.name}", pygame.time.get_ticks()))
                 
                 # End simulation if all poachers are caught
                 if len(alive_poacher_sprites) == 0:
@@ -141,24 +132,14 @@ def run(optimizer_type='pso'):
                                 
             # animal detected by drone
             if event.type == DRONE_DETECTED_ANIMAL:
-                animal = event.animal
+                animal = event.dict['animal']
                 detected_animal_sprites.add(animal)
 
             # poacher detected by drone
             if event.type == DRONE_DETECTED_POACHER:
-                # Get the poacher from the event dictionary
                 poacher = event.dict['poacher']
-                event_log.append((f"Drone caught poacher {poacher.name}", pygame.time.get_ticks()))
-                
-                # Set poacher to terminal state and remove from alive sprites
-                poacher.set_state(Terminal())
-                alive_poacher_sprites.remove(poacher)
-                
-                # Check if all poachers are caught
-                if len(alive_poacher_sprites) == 0:
-                    event_log.append(("Congratulations! All poachers have been caught", pygame.time.get_ticks()))
-                    running = False
-            
+                detected_poacher_sprites.add(poacher)
+                            
             # drone lost track of poacher
             if event.type == DRONE_LOST_POACHER:
                 poacher = event.poacher
@@ -173,10 +154,10 @@ def run(optimizer_type='pso'):
         for animal in alive_animal_sprites:
 
             # Scan surroundings for poachers
-            detected_agent = animal.scan_surroundings(agents=alive_poacher_sprites, mode='nearest')
+            detected_poacher = animal.scan_surroundings(agents=alive_poacher_sprites, mode='nearest')
 
             # Update threat
-            animal.threat = detected_agent[2] if detected_agent else None
+            animal.threat = detected_poacher[2] if detected_poacher else None
             
             # Update my current herd
             animal.herd = [a[2] for a in animal.scan_surroundings(agents=alive_animal_sprites, mode='all')]
@@ -193,35 +174,20 @@ def run(optimizer_type='pso'):
         # Update poachers
         for poacher in alive_poacher_sprites:
             
-            # Share target information among poachers
-            shared_targets = {}
-            for poacher in alive_poacher_sprites:
-                if poacher.target:
-                    shared_targets[poacher.name] = poacher.target
-
-            # Then for each poacher that doesn't have a target:
-            if not poacher.target and shared_targets:
-                # Pick a random target someone else has found
-                poacher.target = random.choice(list(shared_targets.values()))
-
             # Scan surroundings for the closest animal
-            detected_agent = poacher.scan_surroundings(agents=alive_animal_sprites, mode='nearest')
+            detected_agents = poacher.scan_surroundings(agents=alive_animal_sprites, mode='all')
 
-            # If poacher detected an animal, update if there is no other target
-            if detected_agent:
-                # Update target
-                poacher.target = detected_agent[2] if not poacher.target else poacher.target
+            if detected_agents:
+                # Update target if one is found and there is no current target
+                target = detected_agents.pop()[2]
+                poacher.target = target if poacher.target is None else poacher.target
                 
-                if detected_agent and not poacher.target:
-                    # Record memory of this animal sighting
-                    new_memory = {
-                        'position': detected_agent[2].position.copy(),
-                        'time': pygame.time.get_ticks()
-                    }
-                    poacher.memory.insert(0, new_memory)  # Insert at beginning (most recent)
-                    if len(poacher.memory) > poacher.memory_capacity:
-                        poacher.memory.pop()  # Remove oldest memory if capacity exceeded
-        
+                # Update memory of animal sightings with the closest animals
+                temp_agents = sorted(detected_agents, key=lambda x: x[0], reverse=True) # Sort by distance
+                for _, _, agent in temp_agents:
+                    new_memory = ('animal', agent.position)
+                    poacher.memory.appendleft(new_memory)
+            
             else:
                 poacher.target = None
             
@@ -298,77 +264,10 @@ def run(optimizer_type='pso'):
         
         # Render information panel
         render_info_panel(screen, drones_sprites, alive_animal_sprites, 
-                         alive_poacher_sprites, event_log, panel_rect, font, title_font)
+                         alive_poacher_sprites, event_log, panel_rect)
         
         pygame.display.flip()
         
-        
-        # Check if we're in victory screen mode
-        if 'victory_screen' in locals() and victory_screen:
-            # Display victory message in center of screen
-            victory_font = pygame.font.SysFont('Arial', 32, bold=True)
-            victory_text = victory_font.render("VICTORY! All poachers have been caught", True, (255, 255, 255))
-            victory_rect = victory_text.get_rect(center=(WIDTH//2, HEIGHT//2))
-            screen.blit(victory_text, victory_rect)
-
-            # Add instruction to continue
-            continue_font = pygame.font.SysFont('Arial', 24)
-            continue_text = continue_font.render("Press any key to exit", True, (200, 200, 200))
-            continue_rect = continue_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 50))
-            screen.blit(continue_text, continue_rect)
-
-            pygame.display.flip()
-
-            # Check for keypress to exit
-            victory_exit = False
-            while not victory_exit:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT or event.type == pygame.KEYDOWN:
-                        victory_exit = True
-                        running = False
-        """
-        # Check if we're in victory screen mode
-        if 'victory_screen' in locals() and victory_screen:
-            # Display victory message in center of screen
-            victory_font = pygame.font.SysFont('Arial', 32, bold=True)
-            victory_text = victory_font.render("VICTORY! All poachers have been caught", True, (255, 255, 255))
-            victory_rect = victory_text.get_rect(center=(WIDTH//2, HEIGHT//2))
-            screen.blit(victory_text, victory_rect)
-            
-            # Add options
-            options = ["(1) Change optimizer", "(2) Restart", "(3) Quit"]
-            option_font = pygame.font.SysFont('Arial', 24)
-            
-            for i, option in enumerate(options):
-                option_text = option_font.render(option, True, (200, 200, 200))
-                option_rect = option_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 50 + (i * 30)))
-                screen.blit(option_text, option_rect)
-            
-            pygame.display.flip()
-            
-            # Check for keypress to handle options
-            victory_exit = False
-            while not victory_exit:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        victory_exit = True
-                        running = False
-                    elif event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_1:
-                            # Change optimizer logic
-                            current_optimizer = (current_optimizer + 1) % len(optimizer_options)
-                            victory_exit = True
-                            # Reset game but keep the same optimizer
-                        elif event.key == pygame.K_2:
-                            # Restart logic
-                            victory_exit = True
-                            # Reset all game variables here
-                            reset_game()
-                        elif event.key == pygame.K_3:
-                            # Quit logic
-                            victory_exit = True
-                            running = False
-        """
     pygame.quit()
 
 
