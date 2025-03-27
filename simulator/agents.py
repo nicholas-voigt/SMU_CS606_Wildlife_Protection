@@ -131,7 +131,7 @@ class Agent(pygame.sprite.Sprite):
             distance = self.position.distance_to(agent.position)
 
             # If the agent is within the scan range, add it to the heap
-            if distance < self.scan_range:
+            if distance < self.scan_range * self.active_state.scan_range_modifier:
                 heapq.heappush(detected_agents, (self.position.distance_to(agent.position), tie_breaker, agent))
                 tie_breaker += 1
 
@@ -151,6 +151,8 @@ class Drone(Agent):
         self.type = 'Drone'
         self.base_speed = DRONE_SPEED
         self.scan_range = DRONE_SCAN_RANGE
+        self.catch_range = DRONE_CATCH_RANGE
+        self.target = None 
         # Set initial state
         self.set_state(DroneHighAltitude())
 

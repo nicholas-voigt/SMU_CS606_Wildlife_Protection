@@ -19,6 +19,7 @@ ANIMAL_COLOR = (0, 255, 0)  # Green
 # Drone Parameters
 DRONE_SPEED = 10
 DRONE_SCAN_RANGE = 200
+DRONE_CATCH_RANGE = 25
 
 # Poacher Parameters
 POACHER_SPEED = 5

@@ -202,28 +202,23 @@ def run(optimizer_type='pso'):
             poacher.active_state.action()
 
         # Update drones
-        # empty the global list of detected agents first and then rebuild
+        # 1. Update current sightings of animals and poachers
         detected_animal_sprites.empty()
         detected_poacher_sprites.empty()
         
         for drone in drones_sprites:
-            # Scan surroundings for animals
+            # Scan surroundings for animals & add to detected
             detected_agents = drone.scan_surroundings(agents=animals_sprites, mode='all')
-                
-            # Add detected animals to the global list
             for (_, _, agent) in detected_agents:
                 detected_animal_sprites.add(agent)
             
-            # If drone state is Low Altitude, also check for poachers
+            # If drone state is Low Altitude, also check for poachers & add to detected
             if isinstance(drone.active_state, DroneLowAltitude):
-                # Scan surroundings for poachers
                 detected_agents = drone.scan_surroundings(agents=poachers_sprites, mode='all')
-                
-                # Add detected poachers to the global list
                 for (_, _, agent) in detected_agents:
                     detected_poacher_sprites.add(agent)
             
-        # Get drone actions from optimizer
+        # 2. Push current state to optimizer and get drone actions
         drone_actions = optimizer.optimize(drones_sprites, detected_animal_sprites, detected_poacher_sprites)
         
         # Apply drone actions
@@ -233,9 +228,14 @@ def run(optimizer_type='pso'):
                 drone.set_state(action['state'])
                 event_log.append((f"{drone.name} changed state to {action['state'].__class__.__name__}", pygame.time.get_ticks()))
             
-            # Move drone in the specified direction with specified speed
-            drone.move(action['direction'], action['speed_modifier'] * drone.base_speed)
+            # Set closest poacher as target to catch
+            poacher = drone.scan_surroundings(agents=detected_poacher_sprites, mode='nearest')
+            drone.target = poacher[2] if poacher else None
+            
+            # Perform state action with given parameters
+            drone.active_state.action(action['direction'], action['speed_modifier'])
 
+            
         # Update screen
         clock.tick(FPS)
         screen.fill((30, 30, 30))  # Fill the entire screen with background color

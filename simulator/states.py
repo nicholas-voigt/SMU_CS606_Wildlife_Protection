@@ -40,8 +40,10 @@ class DroneHighAltitude(State):
     def __init__(self):
         super().__init__()
         
-    def action(self):
-        # Implementation of state action through optimizer
+    def action(self, direction, speed_optimizer):
+        # Calculate correct speed & move agent
+        speed = min(self.agent.base_speed * speed_optimizer, self.agent.base_speed * self.speed_modifier)
+        self.agent.move(direction, speed)
         return
 
     def check_transition(self):
@@ -53,8 +55,18 @@ class DroneLowAltitude(State):
     def __init__(self):
         super().__init__(speed_modifier=0.7, scan_range_modifier=0.5, detection_probability=0.9)
 
-    def action(self):
-        # Implementation of state action through optimizer
+    def action(self, direction, speed_optimizer):
+        # Calculate correct speed & move agent
+        speed = min(self.agent.base_speed * speed_optimizer, self.agent.base_speed * self.speed_modifier)
+        self.agent.move(direction, speed)
+        
+        # If has target and in range, catch
+        if self.agent.target:
+            distance = self.agent.position.distance_to(self.agent.target.position)
+            if distance < self.agent.catch_range:
+                catch_event = pygame.event.Event(DRONE_CAUGHT_POACHER, {'poacher': self.agent.target, 'drone': self.agent})
+                pygame.event.post(catch_event)
+                self.agent.target = None      
         return
 
     def check_transition(self):
