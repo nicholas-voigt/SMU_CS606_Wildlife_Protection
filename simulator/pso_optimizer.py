@@ -2,11 +2,12 @@ import pygame
 import random
 from optimizer import DroneOptimizer
 from states import DroneHighAltitude, DroneLowAltitude
+from events import DRONE_CAUGHT_POACHER
 
 class PSOOptimizer(DroneOptimizer):
     """Particle Swarm Optimization for drone control"""
     
-    def __init__(self, particles_per_drone=20, w=0.6, c1=1.5, c2=1.5):
+    def __init__(self, particles_per_drone=20, w=0.5, c1=1.5, c2=1.5):
         self.particles_per_drone = particles_per_drone
         self.w = w  # Inertia weight
         self.c1 = c1  # Cognitive parameter
@@ -48,15 +49,25 @@ class PSOOptimizer(DroneOptimizer):
             # If we have detected animals, incentivize searching around their radius
             for animal in detected_animals:
                 distance_to_animal = position.distance_to(animal.position)
-                # Higher fitness for positions just outside the animal's radius
-                # optimal_distance = animal.scan_range * 1.2  # 20% outside radius
-                optimal_distance = random.uniform(animal.scan_range, animal.scan_range * 1.2)
-
+                
+                # Target a stable band around the animal
+                optimal_distance = animal.scan_range * 1.1
+                band_margin = 10
                 distance_diff = abs(distance_to_animal - optimal_distance)
-                fitness += 100 / (distance_diff + 1)
 
-                if stagnation_count > 15:
-                    fitness -= 20
+                if distance_diff <= band_margin:
+                    fitness += 50 / (distance_diff + 1)
+
+                # Optional: encourage directional (tangential) movement
+                if hasattr(self, 'current_particle') and self.current_particle['last_position'] is not None:
+                    move_vector = position - self.current_particle['last_position']
+                    if move_vector.length() > 0:
+                        radial_vector = animal.position - position
+                        tangentiality = 1 - abs(move_vector.normalize().dot(radial_vector.normalize()))
+                        fitness += tangentiality * 10  # higher if moving sideways around animal
+
+                if stagnation_count > 5:
+                    fitness -= 50
                 
         # If we're in low altitude, prioritize monitoring detected entities
         else:
@@ -65,7 +76,7 @@ class PSOOptimizer(DroneOptimizer):
                 distance = position.distance_to(poacher.position)
                 fitness += 100 / (distance + 1)
 
-                if stagnation_count > 15:
+                if stagnation_count > 5:
                     fitness -= 20   
             
         return fitness
@@ -87,6 +98,7 @@ class PSOOptimizer(DroneOptimizer):
             """
             # Update particles
             for particle in self.particles[drone.name]:
+                self.current_particle = particle
                 # Calculate fitness
                 particle['fitness'] = self.calculate_fitness(particle['position'], detected_poachers, detected_animals, particle['stagnation_count'])
                 
