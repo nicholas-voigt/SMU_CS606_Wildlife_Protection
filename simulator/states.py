@@ -189,7 +189,7 @@ class PoacherIdle(State):
         # If memory of animal locations, move towards the most recent memory
         if self.agent.memory:
             # Get the most recent memory & move towards it
-            target_position = self.agent.memory[0][1]
+            target_position = self.agent.memory.popleft()[1]
             self.agent.move(target_position, mode='position')
         
         # Follow search pattern of expanding circles
