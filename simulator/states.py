@@ -5,6 +5,7 @@ import random
 import math
 
 from events import POACHER_ATTACK_ANIMAL, ANIMAL_KILLED, DRONE_DETECTED_POACHER, DRONE_CAUGHT_POACHER,DRONE_DETECTED_ANIMAL, DRONE_LOST_POACHER, DRONE_LOST_ANIMAL
+from settings import FPS
 
 class State:
     def __init__(self, speed_modifier=1.0, scan_range_modifier=1.0, detection_probability=1.0):
@@ -64,7 +65,7 @@ class DroneLowAltitude(State):
 # Animal states
 class AnimalIdle(State):
     def __init__(self):
-        super().__init__(speed_modifier=0.3)
+        super().__init__(speed_modifier=0.5)
         self.herd_cohesion=0.8
         self.separation_weight = 1.2
         self.random_weight = 0.3
@@ -131,7 +132,7 @@ class AnimalIdle(State):
 
 class AnimalFleeing(State):
     def __init__(self):
-        super().__init__(speed_modifier=1.5)
+        super().__init__(speed_modifier=1.0)
         self.herd_cohesion = 0
 
     def action(self):
@@ -167,6 +168,10 @@ class PoacherIdle(State):
     
     def __init__(self):
         super().__init__(speed_modifier=0.5, scan_range_modifier=1.0, detection_probability=1.0)
+        self.search_time = 0
+        self.time_since_direction_change = 0
+        self.search_angle = random.randint(0, 360)
+        self.max_interval = FPS * 5  # Change direction every 3 seconds
 
     def action(self):
         # If memory of animal locations, move towards the most recent memory
@@ -176,10 +181,22 @@ class PoacherIdle(State):
             self.agent.move(target_position, mode='position')
         
         # Follow search pattern of expanding circles
-        else:        
-            current_tick = pygame.time.get_ticks() // 60  # Change direction every 60 ticks
-            angle = current_tick % 8 * 45  # 8 directions, changing over time
-            direction = pygame.Vector2(math.cos(math.radians(angle)), math.sin(math.radians(angle)))
+        else:
+            # Change direction every few seconds
+            self.search_time += 1
+            self.time_since_direction_change += 1      
+
+            # Calculate direction change interval using logarithmic growth
+            # This will start small and grow toward max_interval
+            direction_change_interval = self.max_interval * (1 - 1 / math.log(1 + self.search_time / 2))
+            
+            # Change direction when interval is reached
+            if self.time_since_direction_change >= direction_change_interval:
+                self.search_angle = (self.search_angle + 45) % 360
+                self.time_since_direction_change = 0
+            
+            # Create direction vector from angle with increasing magnitude
+            direction = pygame.Vector2(math.cos(math.radians(self.search_angle)), math.sin(math.radians(self.search_angle)))
             self.agent.move(direction, mode='direction')
         return
     
@@ -197,7 +214,7 @@ class PoacherHunting(State):
     Can only be in this state if a target animal is in sight.
     """
     def __init__(self):
-        super().__init__(speed_modifier=1.0, scan_range_modifier=1.0, detection_probability=1.0)
+        super().__init__(speed_modifier=1.2, scan_range_modifier=1.0, detection_probability=1.0)
         
     def action(self):
         # Get target position and move towards it
