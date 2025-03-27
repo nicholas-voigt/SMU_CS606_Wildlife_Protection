@@ -50,10 +50,11 @@ def run(optimizer_type='pso'):
     event_log.append(("Simulation started", pygame.time.get_ticks()))
 
     # Create agents
-    drones = [Drone('good boy1', 100, 100), Drone('good boy2', 100, 100), Drone('good boy3', 100, 100)]
-    animals = [Animal('elephant1', 400, 300), Animal('elephant2', 410, 300), Animal('giraffe1', 400, 310), Animal('giraffe2', 410, 310)]
+    drones = [Drone('good boy1', 100, 100), Drone('good boy2', 700, 100), Drone('good boy3', 100, 400)]
+    animals = [Animal('elephant1', 400, 300), Animal('elephant2', 410, 300), Animal('elephant3', 400, 310), Animal('elephant4', 410, 310), 
+               Animal('giraffe1', 700, 300), Animal('giraffe2', 710, 300), Animal('giraffe3', 700, 300), Animal('giraffe4', 710, 310)]
     # animals = [Animal('elephant1', 400, 300), Animal('elephant2', 410, 300)]
-    poachers = [Poacher('bad boy', 400, 500)]
+    poachers = [Poacher('bad boy1', 400, 500), Poacher('bad boy2', 650, 500)]
 
     all_sprites = pygame.sprite.Group(drones + animals + poachers)
     
@@ -214,7 +215,7 @@ def run(optimizer_type='pso'):
             
             # If drone state is Low Altitude, also check for poachers & add to detected
             if isinstance(drone.active_state, DroneLowAltitude):
-                detected_agents = drone.scan_surroundings(agents=poachers_sprites, mode='all')
+                detected_agents = drone.scan_surroundings(agents=alive_poacher_sprites, mode='all')
                 for (_, _, agent) in detected_agents:
                     detected_poacher_sprites.add(agent)
             
