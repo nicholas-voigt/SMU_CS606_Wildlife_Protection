@@ -98,11 +98,16 @@ def render_info_panel(screen, drones, animals, poachers, event_log, panel_rect):
             y_offset += 20
 
 
-def end_simulation(screen, type):
+def end_simulation(screen, type, info):
     """Render the end of simulation screen with the given message"""
 
     # Clear previous events to prevent stacking
     pygame.event.clear()
+
+    # Create a semi-transparent dark overlay
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 150))
+    screen.blit(overlay, (0, 0))
     
     # Rendering instructions
     msg_font = pygame.font.SysFont('Arial', 32, bold=True)
@@ -121,8 +126,11 @@ def end_simulation(screen, type):
         screen.blit(defeat_text, defeat_rect)
 
     # Add instruction to continue
+    insights_text = instr_font.render(f"Poachers caught: {info['poachers'] * 100}%, Animals still alive: {info['animals'] * 100}%, Time taken: {pygame.time.get_ticks()}ms", True, (200, 200, 200))
+    insights_rect = insights_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 50))
+    screen.blit(insights_text, insights_rect)   
     continue_text = instr_font.render("Press any key to exit", True, (200, 200, 200))
-    continue_rect = continue_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 50))
+    continue_rect = continue_text.get_rect(center=(WIDTH//2, HEIGHT//2 + 100))
     screen.blit(continue_text, continue_rect)   
     
     pygame.display.flip()

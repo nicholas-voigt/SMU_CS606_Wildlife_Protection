@@ -112,7 +112,7 @@ def run(optimizer_type='pso'):
                 
                 # Check if all animals are dead to end the game
                 if len(alive_animal_sprites) == 0:
-                    end_simulation(screen, "Defeat")
+                    end_simulation(screen, "Defeat", {"poachers": 1 - len(alive_poacher_sprites) / len(poachers_sprites), "animals": len(alive_animal_sprites) / len(animals_sprites)})
                     continue  # Skip the rest of the loop since the game is over
                 
             # poacher caught by drone
@@ -128,7 +128,7 @@ def run(optimizer_type='pso'):
                 
                 # End simulation if all poachers are caught
                 if len(alive_poacher_sprites) == 0:
-                    end_simulation(screen, "Victory")
+                    end_simulation(screen, "Victory", {"poachers": 1 - len(alive_poacher_sprites) / len(poachers_sprites), "animals": len(alive_animal_sprites) / len(animals_sprites)})
                     continue  # Skip the rest of the loop since the game is over
                                 
             # animal detected by drone
