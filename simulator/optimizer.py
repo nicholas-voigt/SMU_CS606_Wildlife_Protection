@@ -1,6 +1,4 @@
 from abc import ABC, abstractmethod
-import pygame
-from states import DroneHighAltitude, DroneLowAltitude
 
 class DroneOptimizer(ABC):
     """

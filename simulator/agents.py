@@ -10,7 +10,7 @@ import heapq
 from collections import deque
 
 from settings import *
-from states import DroneHighAltitude, AnimalIdle, PoacherIdle
+from states import DroneFastSearch, AnimalIdle, PoacherIdle
 
 
 class Agent(pygame.sprite.Sprite):
@@ -66,7 +66,7 @@ class Agent(pygame.sprite.Sprite):
         Move agent to the given position if within speed range, else on a vector towards it.
         Args:
             vector: pygame.Vector2, can be position to move to or direction to move in
-            speed: int, speed to move with if specified
+            speed: int (optional), speed to move with, if None method uses base speed
             mode: str, 'direction' or 'position', whether vector is a direction or a position
         """
         # use given speed if specified or calculate the velocity to move with
@@ -112,7 +112,7 @@ class Agent(pygame.sprite.Sprite):
             agents: list of agents to check for
             mode: str, 'all' or 'nearest', whether to return all detected agents or only the nearest one
         Returns:
-            detected_agents: list, list of detected agents with (distance, tie_breaker, agent) tuples or single agent or empty list
+            detected_agents: list, heapified list of detected agents with (distance, tie_breaker, agent) tuples for mode all or single tuple for mode nearest. If no agents found, returns empty list.
         """
 
         # Create a heap to store detected agents
@@ -154,7 +154,7 @@ class Drone(Agent):
         self.catch_range = DRONE_CATCH_RANGE
         self.target = None 
         # Set initial state
-        self.set_state(DroneHighAltitude())
+        self.set_state(DroneFastSearch())
 
 
 class Animal(Agent):

@@ -4,8 +4,6 @@
 
 import sys
 import pygame
-import time
-import random
 from collections import deque
 import pickle
 
@@ -13,7 +11,7 @@ from settings import WIDTH, GAME_WIDTH, PANEL_WIDTH, HEIGHT, FPS
 from game_env import render_info_panel, end_simulation
 from events import POACHER_ATTACK_ANIMAL, ANIMAL_KILLED, DRONE_DETECTED_POACHER, DRONE_CAUGHT_POACHER, DRONE_DETECTED_ANIMAL, DRONE_LOST_POACHER, DRONE_LOST_ANIMAL
 from agents import Drone, Animal, Poacher
-from states import Terminal, DroneHighAltitude, DroneLowAltitude
+from states import Terminal, DroneFastSearch, DroneDeepSearch
 from pso_optimizer import PSOOptimizer
 from rl_optimizer import RLOptimizer
 
@@ -31,8 +29,7 @@ def run(optimizer=None, headless=False):
         pygame.display.set_caption("Wildlife Protection Simulator")
         # Set up the clock for controlling frame rate
         clock = pygame.time.Clock()
-        # Create rectangles for game area and panel
-        game_rect = pygame.Rect(0, 0, GAME_WIDTH, HEIGHT)
+        # Create rectangle for panel
         panel_rect = pygame.Rect(GAME_WIDTH, 0, PANEL_WIDTH, HEIGHT)
         # Create a transparent surface to visualize the scan range of agents
         transparent_surface = pygame.Surface((GAME_WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -65,7 +62,6 @@ def run(optimizer=None, headless=False):
     drones = [Drone('good boy1', 100, 100), Drone('good boy2', 700, 100), Drone('good boy3', 100, 400)]
     animals = [Animal('elephant1', 400, 300), Animal('elephant2', 410, 300), Animal('elephant3', 400, 310), Animal('elephant4', 410, 310), 
                Animal('giraffe1', 700, 300), Animal('giraffe2', 710, 300), Animal('giraffe3', 700, 300), Animal('giraffe4', 710, 310)]
-    # animals = [Animal('elephant1', 400, 300), Animal('elephant2', 410, 300)]
     poachers = [Poacher('bad boy1', 400, 500), Poacher('bad boy2', 650, 500)]
 
     all_sprites = pygame.sprite.Group(drones + animals + poachers)
@@ -155,27 +151,7 @@ def run(optimizer=None, headless=False):
                         end_simulation(screen, "Victory", {"poachers": 1 - len(alive_poacher_sprites) / len(poachers_sprites), "animals": len(alive_animal_sprites) / len(animals_sprites)})
                     running = False
                     continue  # Skip the rest of the loop since the game is over
-                                
-            # animal detected by drone
-            if event.type == DRONE_DETECTED_ANIMAL:
-                animal = event.dict['animal']
-                detected_animal_sprites.add(animal)
-
-            # poacher detected by drone
-            if event.type == DRONE_DETECTED_POACHER:
-                poacher = event.dict['poacher']
-                detected_poacher_sprites.add(poacher)
-                            
-            # drone lost track of poacher
-            if event.type == DRONE_LOST_POACHER:
-                poacher = event.poacher
-                detected_poacher_sprites.remove(poacher)
-            
-            # drone lost track of animal
-            if event.type == DRONE_LOST_ANIMAL:
-                animal = event.animal
-                detected_animal_sprites.remove(animal)
-        
+                
         # Update animals
         for animal in alive_animal_sprites:
 
@@ -238,7 +214,7 @@ def run(optimizer=None, headless=False):
                 detected_animal_sprites.add(agent)
             
             # If drone state is Low Altitude, also check for poachers & add to detected
-            if isinstance(drone.active_state, DroneLowAltitude):
+            if isinstance(drone.active_state, DroneDeepSearch):
                 detected_agents = drone.scan_surroundings(agents=alive_poacher_sprites, mode='all')
                 for (_, _, agent) in detected_agents:
                     detected_poacher_sprites.add(agent)
@@ -293,6 +269,11 @@ def run(optimizer=None, headless=False):
         
             pygame.display.flip()
     
+    # Close pygame if not headless
+    if not headless:
+        pygame.quit()
+        
+    # return simulation results for analysis
     return {
         'outcome': outcome,
         'steps': simulation_steps,
@@ -317,13 +298,16 @@ def train_optimizer(num_runs=50, optimizer_type='rl', model_filename='rl_model.p
     if optimizer_type == 'rl':
         # Load RL optimizer
         optimizer = RLOptimizer()
-        optimizer.load_model(model_filename)
     elif optimizer_type == 'pso':
         # Load PSO optimizer
         optimizer = PSOOptimizer()
         
     for run_num in range(1, num_runs+1):
         print(f"\n--- Starting Run {run_num}/{num_runs} ---")
+        
+        # load model if optimizer is RL and model exists
+        if optimizer_type == 'rl':
+            optimizer.load_model(model_filename)
         
         # Track current run performance 
         result = run(optimizer, headless=True)
@@ -335,7 +319,6 @@ def train_optimizer(num_runs=50, optimizer_type='rl', model_filename='rl_model.p
         stats['steps_per_run'].append(result['steps'])
         
         if optimizer_type == 'rl':
-            # Save RL model
             optimizer.save_model(model_filename)
         
         # Print statistics so far
@@ -371,10 +354,16 @@ if __name__ == '__main__':
             train_optimizer(num_runs=num_runs, optimizer_type=type)
         elif sys.argv[1].lower() in ["pso", "rl"]:
             # Regular single-run mode
-            optimizer = PSOOptimizer() if sys.argv[1].lower() == "pso" else RLOptimizer()
+            if sys.argv[1].lower() == "pso":
+                print("Running with PSO optimizer")
+                optimizer = PSOOptimizer()
+            else:
+                print("Running with RL optimizer")
+                optimizer = RLOptimizer()
+                optimizer.load_model('rl_model.pkl')
             run(optimizer)
         else:
-            print("Usage: python main.py [train] [pso|rl] [num_runs]")
+            print("Usage: python main.py [train] [num_runs] [pso|rl]")
     else:
         # Default to PSO
         run()

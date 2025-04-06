@@ -1,8 +1,7 @@
 import pygame
 import random
 from optimizer import DroneOptimizer
-from states import DroneHighAltitude, DroneLowAltitude
-from events import DRONE_CAUGHT_POACHER
+from states import DroneFastSearch, DroneDeepSearch
 
 class PSOOptimizer(DroneOptimizer):
     """Particle Swarm Optimization for drone control"""
@@ -39,7 +38,7 @@ class PSOOptimizer(DroneOptimizer):
         fitness = 0
         
         # If we're in high altitude, prioritize searching for poachers
-        if isinstance(self.current_drone.active_state, DroneHighAltitude):
+        if isinstance(self.current_drone.active_state, DroneFastSearch):
             # Base fitness for being in high altitude
             fitness += 30
             
@@ -88,7 +87,6 @@ class PSOOptimizer(DroneOptimizer):
             self.current_drone = drone  # Store current drone for fitness calculation
             self.initialize_particles(drone)
             
-
             """For each particle, calculate the fitness.
             If the particle has been in the same position for too long, it will be penalized.
             current_best_fitness is the best fitness of the particle.
@@ -162,16 +160,16 @@ class PSOOptimizer(DroneOptimizer):
                 
                 if within_radius:
                     # Only switch to low altitude if we're within an animal's radius
-                    if not isinstance(drone.active_state, DroneLowAltitude):
-                        new_state = DroneLowAltitude()
+                    if not isinstance(drone.active_state, DroneDeepSearch):
+                        new_state = DroneDeepSearch()
                 else:
                     # If we detect animals but aren't within radius, stay in high altitude
-                    if not isinstance(drone.active_state, DroneHighAltitude):
-                        new_state = DroneHighAltitude()
+                    if not isinstance(drone.active_state, DroneFastSearch):
+                        new_state = DroneFastSearch()
             else:
                 # If no animals detected, go to high altitude for wider search
-                if not isinstance(drone.active_state, DroneHighAltitude):
-                    new_state = DroneHighAltitude()
+                if not isinstance(drone.active_state, DroneFastSearch):
+                    new_state = DroneFastSearch()
                     
             # Add drone actions to return dictionary
             drone_actions[drone] = {

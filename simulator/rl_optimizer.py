@@ -5,7 +5,7 @@ import pickle
 import os
 from collections import deque
 from optimizer import DroneOptimizer
-from states import DroneHighAltitude, DroneLowAltitude
+from states import DroneFastSearch, DroneDeepSearch
 from events import DRONE_CAUGHT_POACHER
 
 class RLOptimizer(DroneOptimizer):
@@ -100,7 +100,7 @@ class RLOptimizer(DroneOptimizer):
         poachers_detected = min(1, len(detected_poachers))
         
         # Altitude state
-        altitude = 1 if isinstance(drone.active_state, DroneLowAltitude) else 0
+        altitude = 1 if isinstance(drone.active_state, DroneDeepSearch) else 0
         
         # Create state key
         state_key = (grid_x, grid_y, animals_detected, poachers_detected, altitude)
@@ -111,14 +111,14 @@ class RLOptimizer(DroneOptimizer):
         """Enhanced reward calculation with stronger exploration incentives"""
         reward = 0
         
-        # Increased rewards for detection
+        # Rewards for detection
         if detected_animals:
             reward += 30
         
         if detected_poachers:
             reward += 100
             
-            # Enhanced proximity bonus
+            # Proximity bonus
             for poacher in detected_poachers:
                 distance = drone.position.distance_to(poacher.position)
                 proximity_bonus = max(0, 15 - (distance / 30))
@@ -128,7 +128,7 @@ class RLOptimizer(DroneOptimizer):
         if not detected_poachers and not detected_animals:
             reward -= 20
         
-        # More aggressive exploration bonus
+        # Exploration bonus
         grid_x = min(self.grid_x_divisions - 1, max(0, int(drone.position.x / (self.map_width/self.grid_x_divisions))))
         grid_y = min(self.grid_y_divisions - 1, max(0, int(drone.position.y / (self.map_height/self.grid_y_divisions))))
         grid_location = (grid_x, grid_y)
@@ -136,10 +136,10 @@ class RLOptimizer(DroneOptimizer):
         if grid_location in self.grid_exploration_count:
             visit_count = self.grid_exploration_count[grid_location]
             
-            # Steeper exploration penalty
+            # Exploration penalty
             exploration_penalty = -self.exploration_penalty_multiplier * (visit_count ** 0.7)
             
-            # Enhanced exploration bonus
+            # Exploration bonus
             exploration_bonus = self.exploration_bonus_weight * (1 / (visit_count ** 0.5))
             
             reward += exploration_bonus + exploration_penalty
@@ -174,9 +174,7 @@ class RLOptimizer(DroneOptimizer):
         
         # Normal action selection
         return max(self.q_table[state], key=self.q_table[state].get)
-    
-    # The rest of the methods remain the same as in the previous implementation
-    
+        
     def optimize(self, drones, detected_animals, detected_poachers):
         drone_actions = {}
         self.episode_step += 1
@@ -191,7 +189,7 @@ class RLOptimizer(DroneOptimizer):
         
         for drone in drones:
             # Check if drone can catch any poachers - with probability based on distance
-            if isinstance(drone.active_state, DroneLowAltitude):  # Only catch in low altitude
+            if isinstance(drone.active_state, DroneDeepSearch):  # Only catch in low altitude
                 for poacher in detected_poachers:
                     distance = drone.position.distance_to(poacher.position)
                     
@@ -275,10 +273,10 @@ class RLOptimizer(DroneOptimizer):
             direction.normalize()
             
         new_state = None
-        if action[2] == 1 and not isinstance(drone.active_state, DroneLowAltitude):
-            new_state = DroneLowAltitude()
-        elif action[2] == 0 and not isinstance(drone.active_state, DroneHighAltitude):
-            new_state = DroneHighAltitude()
+        if action[2] == 1 and not isinstance(drone.active_state, DroneDeepSearch):
+            new_state = DroneDeepSearch()
+        elif action[2] == 0 and not isinstance(drone.active_state, DroneFastSearch):
+            new_state = DroneFastSearch()
             
         return {
             'state': new_state,

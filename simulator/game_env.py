@@ -1,5 +1,4 @@
-# defines the simulation environment
-# handles rendering
+# handles additional rendering of the game environment, including the information panel and end simulation screen.
 
 import pygame
 from settings import WIDTH, HEIGHT

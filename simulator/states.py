@@ -4,7 +4,7 @@ import pygame
 import random
 import math
 
-from events import POACHER_ATTACK_ANIMAL, ANIMAL_KILLED, DRONE_DETECTED_POACHER, DRONE_CAUGHT_POACHER,DRONE_DETECTED_ANIMAL, DRONE_LOST_POACHER, DRONE_LOST_ANIMAL
+from events import POACHER_ATTACK_ANIMAL, DRONE_CAUGHT_POACHER
 from settings import FPS
 
 class State:
@@ -36,7 +36,7 @@ class State:
 
 
 # Drone states
-class DroneHighAltitude(State):
+class DroneFastSearch(State):
     def __init__(self):
         super().__init__()
         
@@ -48,10 +48,10 @@ class DroneHighAltitude(State):
 
     def check_transition(self):
         # always true for low altitude state
-        return DroneLowAltitude()
+        return DroneDeepSearch()
 
 
-class DroneLowAltitude(State):
+class DroneDeepSearch(State):
     def __init__(self):
         super().__init__(speed_modifier=0.7, scan_range_modifier=0.5, detection_probability=0.9)
 
@@ -71,7 +71,7 @@ class DroneLowAltitude(State):
 
     def check_transition(self):
         # always true for high altitude state
-        return DroneHighAltitude()
+        return DroneFastSearch()
 
 
 # Animal states
@@ -226,7 +226,7 @@ class PoacherHunting(State):
     Can only be in this state if a target animal is in sight.
     """
     def __init__(self):
-        super().__init__(speed_modifier=1.2, scan_range_modifier=1.0, detection_probability=1.0)
+        super().__init__(speed_modifier=1.1, scan_range_modifier=1.0, detection_probability=1.0)
         
     def action(self):
         # Get target position and move towards it
@@ -255,7 +255,7 @@ class PoacherHunting(State):
 
 class PoacherAttacking(State):
     def __init__(self):
-        super().__init__(speed_modifier=1.5, scan_range_modifier=1.0, detection_probability=1.0)
+        super().__init__(speed_modifier=1.2, scan_range_modifier=1.0, detection_probability=1.0)
         self.attack_time = 0
         
     def action(self):
