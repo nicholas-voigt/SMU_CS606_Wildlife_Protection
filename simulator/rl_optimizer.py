@@ -1,6 +1,8 @@
 import pygame
 import random
 import numpy as np
+import pickle
+import os
 from collections import deque
 from optimizer import DroneOptimizer
 from states import DroneHighAltitude, DroneLowAltitude
@@ -317,3 +319,30 @@ class RLOptimizer(DroneOptimizer):
                 "y_divisions": self.grid_y_divisions
             }
         }
+    
+    def save_model(self, filename='rl_model.pkl'):
+        """Save the Q-table and learning parameters to a file"""
+        model_data = {
+            'q_table': self.q_table,
+            'exploration_rate': self.exploration_rate,
+            'grid_exploration_count': self.grid_exploration_count,
+            'rewards_history': self.rewards_history,
+            'episode_step': self.episode_step
+        }
+        with open(filename, 'wb') as f:
+            pickle.dump(model_data, f)
+        # print(f"Model saved to {filename}")
+    
+    def load_model(self, filename='rl_model.pkl'):
+        """Load the Q-table and learning parameters from a file"""
+        if os.path.exists(filename):
+            with open(filename, 'rb') as f:
+                model_data = pickle.load(f)
+                self.q_table = model_data['q_table']
+                self.exploration_rate = model_data['exploration_rate']
+                self.grid_exploration_count = model_data['grid_exploration_count']
+                self.rewards_history = model_data['rewards_history']
+                self.episode_step = model_data['episode_step']
+            # print(f"Model loaded from {filename}")
+            return True
+        return False

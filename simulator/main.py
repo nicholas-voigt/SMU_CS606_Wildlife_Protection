@@ -7,6 +7,7 @@ import pygame
 import time
 import random
 from collections import deque
+import pickle
 
 from settings import WIDTH, GAME_WIDTH, PANEL_WIDTH, HEIGHT, FPS
 from game_env import render_info_panel, end_simulation
@@ -18,32 +19,43 @@ from rl_optimizer import RLOptimizer
 
 
 # Main game loop
-def run(optimizer_type='pso'):
+def run(optimizer=None, headless=False):
+    """Main function to run the simulation"""
     
-    # Pygame setup
-    # Initialize pygame
-    pygame.init()
-    # Set up the display
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Wildlife Protection Simulator") 
-    clock = pygame.time.Clock()
-    # Create rectangles for game area and panel
-    game_rect = pygame.Rect(0, 0, GAME_WIDTH, HEIGHT)
-    panel_rect = pygame.Rect(GAME_WIDTH, 0, PANEL_WIDTH, HEIGHT)
-    # Create a transparent surface to visualize the scan range of agents
-    transparent_surface = pygame.Surface((GAME_WIDTH, HEIGHT), pygame.SRCALPHA)
-    # Initialize fonts
-    pygame.font.init()
+    # Pygame setup if headless without display
+    if not headless:
+        # Initialize pygame
+        pygame.init()
+        # Set up the display
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption("Wildlife Protection Simulator")
+        # Set up the clock for controlling frame rate
+        clock = pygame.time.Clock()
+        # Create rectangles for game area and panel
+        game_rect = pygame.Rect(0, 0, GAME_WIDTH, HEIGHT)
+        panel_rect = pygame.Rect(GAME_WIDTH, 0, PANEL_WIDTH, HEIGHT)
+        # Create a transparent surface to visualize the scan range of agents
+        transparent_surface = pygame.Surface((GAME_WIDTH, HEIGHT), pygame.SRCALPHA)
+        # Initialize fonts
+        pygame.font.init()
+    else:
+        # Initialize pygame without display
+        pygame.init()
+        screen = pygame.Surface((WIDTH, HEIGHT))
 
     
-    # Select optimizer based on type
-    if optimizer_type.lower() == "pso":
+    # Load default optimizer if none is provided
+    if optimizer is None:
         optimizer = PSOOptimizer()
-    elif optimizer_type.lower() == "rl":
-        optimizer = RLOptimizer()
+    # Check if provided optimizer is correct instance
+    elif isinstance(optimizer, PSOOptimizer) or isinstance(optimizer, RLOptimizer):
+        pass
     else:
-        raise ValueError(f"Unknown optimizer type: {optimizer_type}")
+        raise ValueError(f"Unknown optimizer: {optimizer}")
     
+    # Track simulation progress
+    simulation_steps = 0
+    outcome = None
     
     # Event log for displaying recent events (max 15 events)
     event_log = deque(maxlen=15)
@@ -75,6 +87,12 @@ def run(optimizer_type='pso'):
     # Main loop
     running = True
     while running:
+        simulation_steps += 1
+        
+        # Early termination to prevent hanging
+        if simulation_steps > 2000:
+            outcome = "timeout"
+            running = False
 
         # Event handling
         for event in pygame.event.get():
@@ -113,7 +131,10 @@ def run(optimizer_type='pso'):
                 
                 # Check if all animals are dead to end the game
                 if len(alive_animal_sprites) == 0:
-                    end_simulation(screen, "Defeat", {"poachers": 1 - len(alive_poacher_sprites) / len(poachers_sprites), "animals": len(alive_animal_sprites) / len(animals_sprites)})
+                    outcome = "defeat"
+                    if not headless:
+                        end_simulation(screen, "Defeat", {"poachers": 1 - len(alive_poacher_sprites) / len(poachers_sprites), "animals": len(alive_animal_sprites) / len(animals_sprites)})
+                    running = False
                     continue  # Skip the rest of the loop since the game is over
                 
             # poacher caught by drone
@@ -129,7 +150,10 @@ def run(optimizer_type='pso'):
                 
                 # End simulation if all poachers are caught
                 if len(alive_poacher_sprites) == 0:
-                    end_simulation(screen, "Victory", {"poachers": 1 - len(alive_poacher_sprites) / len(poachers_sprites), "animals": len(alive_animal_sprites) / len(animals_sprites)})
+                    outcome = "victory"
+                    if not headless:
+                        end_simulation(screen, "Victory", {"poachers": 1 - len(alive_poacher_sprites) / len(poachers_sprites), "animals": len(alive_animal_sprites) / len(animals_sprites)})
+                    running = False
                     continue  # Skip the rest of the loop since the game is over
                                 
             # animal detected by drone
@@ -238,40 +262,119 @@ def run(optimizer_type='pso'):
 
             
         # Update screen
-        clock.tick(FPS)
-        screen.fill((30, 30, 30))  # Fill the entire screen with background color
+        if not headless:
+            clock.tick(FPS)
+            screen.fill((30, 30, 30))  # Fill the entire screen with background color
+            
+            # Draw the game area
+            # Clear the transparent surface
+            transparent_surface.fill((0, 0, 0, 0))  # Completely transparent
         
-        # Draw the game area
-        # Clear the transparent surface
-        transparent_surface.fill((0, 0, 0, 0))  # Completely transparent
-        
-        # Draw scan ranges for each agent type
-        for agent in all_sprites:
-            # Draw a circle on the transparent surface
-            pygame.draw.circle(
-                surface=transparent_surface,
-                color=(*agent.image.get_at((5, 5))[:3], 50),  # Get agent color with 50 alpha
-                center=(int(agent.position.x), int(agent.position.y)),
-                radius=agent.scan_range * agent.active_state.scan_range_modifier,  # Scan range
-                width=1  # Line width
-            )
+            # Draw scan ranges for each agent type
+            for agent in all_sprites:
+                # Draw a circle on the transparent surface
+                pygame.draw.circle(
+                    surface=transparent_surface,
+                    color=(*agent.image.get_at((5, 5))[:3], 50),  # Get agent color with 50 alpha
+                    center=(int(agent.position.x), int(agent.position.y)),
+                    radius=agent.scan_range * agent.active_state.scan_range_modifier,  # Scan range
+                    width=1  # Line width
+                )
 
-        # Draw the game elements
-        all_sprites.draw(screen)
+            # Draw the game elements
+            all_sprites.draw(screen)
 
-        # Blit the transparent surface on top
-        screen.blit(transparent_surface, (0, 0))
+            # Blit the transparent surface on top
+            screen.blit(transparent_surface, (0, 0))
+            
+            # Render information panel
+            render_info_panel(screen, drones_sprites, alive_animal_sprites, 
+                            alive_poacher_sprites, event_log, panel_rect)
         
-        # Render information panel
-        render_info_panel(screen, drones_sprites, alive_animal_sprites, 
-                         alive_poacher_sprites, event_log, panel_rect)
+            pygame.display.flip()
+    
+    return {
+        'outcome': outcome,
+        'steps': simulation_steps,
+        'poachers_caught_pct': 1 - len(alive_poacher_sprites) / len(poachers_sprites),
+        'animals_alive_pct': len(alive_animal_sprites) / len(animals_sprites)
+    }
+
+
+def train_optimizer(num_runs=50, optimizer_type='rl', model_filename='rl_model.pkl'):
+    """Run multiple simulations to train & evaluate the optimizers"""
+    # Statistics tracking
+    stats = {
+        'results': [],
+        'poachers_caught_pct': [],
+        'animals_alive_pct': [],
+        'steps_per_run': [],
+        'victories': 0,
+        'defeats': 0,
+        'timeouts': 0
+    }
+    
+    if optimizer_type == 'rl':
+        # Load RL optimizer
+        optimizer = RLOptimizer()
+        optimizer.load_model(model_filename)
+    elif optimizer_type == 'pso':
+        # Load PSO optimizer
+        optimizer = PSOOptimizer()
         
-        pygame.display.flip()
+    for run_num in range(1, num_runs+1):
+        print(f"\n--- Starting Run {run_num}/{num_runs} ---")
         
-    pygame.quit()
+        # Track current run performance 
+        result = run(optimizer, headless=True)
+        
+        # Update statistics
+        stats['results'].append(result['outcome'])
+        stats['poachers_caught_pct'].append(result['poachers_caught_pct'])
+        stats['animals_alive_pct'].append(result['animals_alive_pct'])
+        stats['steps_per_run'].append(result['steps'])
+        
+        if optimizer_type == 'rl':
+            # Save RL model
+            optimizer.save_model(model_filename)
+        
+        # Print statistics so far
+        print(f"Run {run_num} complete - {result['outcome']} in {result['steps']} steps")
+        
+    # Calculate final statistics
+    stats['victories'] = stats['results'].count('victory')
+    stats['defeats'] = stats['results'].count('defeat')
+    stats['timeouts'] = stats['results'].count('timeout')
+    
+    # Print final statistics
+    print("\n=== Training Complete ===")
+    print(f"Total runs: {num_runs}")
+    print(f"Victories: {stats['victories']} ({stats['victories']/num_runs*100:.1f}%)")
+    print(f"Defeats: {stats['defeats']} ({stats['defeats']/num_runs*100:.1f}%)")
+    print(f"Timeouts: {stats['timeouts']} ({stats['timeouts']/num_runs*100:.1f}%)")
+    print(f"Average poachers caught: {sum(stats['poachers_caught_pct'])/len(stats['poachers_caught_pct']):.1f}%")
+    print(f"Average animals surviving: {sum(stats['animals_alive_pct'])/len(stats['animals_alive_pct']):.1f}%")
+    print(f"Average steps per run: {sum(stats['steps_per_run'])/len(stats['steps_per_run']):.1f}")
+    
+    # Save statistics to file
+    with open('training_stats.pkl', 'wb') as stats_file:
+        pickle.dump(stats, stats_file)
+    
+    return
 
 
 if __name__ == '__main__':
-    # Default to PSO if no argument provided
-    optimizer_type = sys.argv[1] if len(sys.argv) > 1 else "pso"
-    run(optimizer_type)
+    if len(sys.argv) > 1:
+        if sys.argv[1].lower() == "train":
+            type = sys.argv[2].lower() if len(sys.argv) > 2 else 'rl'
+            num_runs = int(sys.argv[3]) if len(sys.argv) > 3 else 50
+            train_optimizer(num_runs=num_runs, optimizer_type=type)
+        elif sys.argv[1].lower() in ["pso", "rl"]:
+            # Regular single-run mode
+            optimizer = PSOOptimizer() if sys.argv[1].lower() == "pso" else RLOptimizer()
+            run(optimizer)
+        else:
+            print("Usage: python main.py [train] [pso|rl] [num_runs]")
+    else:
+        # Default to PSO
+        run()
